@@ -1,18 +1,42 @@
-# Environment variables
-.env
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.Python
-*.egg-info/
-dist/
-build/
+*.env
 .venv/
 venv/
 env/
-.idea/
-.vscode/
+*.egg-info/
+dist/
+build/
+.eggs/
 *.log
-assets/audio/*.wav
-assets/audio/*.mp3
+
+# Environment secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+
+# Node / Frontend
+node_modules/
+dist/
+.vite/
+frontend/.vite/
+
+# IDE & OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Docker
+*.dockerignore
