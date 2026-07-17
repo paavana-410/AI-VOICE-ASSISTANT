@@ -1,24 +1,28 @@
-"""
-config.py — Load and validate all environment variables.
-All other modules import from here; nothing reads os.environ directly.
-"""
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
+# Load backend-specific .env (for JWT, PORT, etc.)
 load_dotenv()
+# Load project-level .env (for API keys, DB connection) from the parent directory
+parent_env = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(parent_env)
 
-# ---------- Groq ----------
-GROQ_API_KEY: str = os.environ["GROQ_API_KEY"]
-# Verify the current model name at https://console.groq.com/docs/models
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+MONGODB_ATLAS_URI: str = os.getenv("MONGODB_ATLAS_URI", os.getenv("MONGO_URI", ""))
+MONGO_URI: str = MONGODB_ATLAS_URI
 
-# ---------- MongoDB Atlas ----------
-MONGODB_ATLAS_URI: str = os.environ["MONGODB_ATLAS_URI"]
-MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "ai_assistant")
-MEMORY_COLLECTION: str = os.getenv("MEMORY_COLLECTION", "mem0_memories")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini")
+
+MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "ai_assistant_db")
+MEMORY_COLLECTION: str = os.getenv("MEMORY_COLLECTION", "memories")
 CONVERSATION_COLLECTION: str = os.getenv("CONVERSATION_COLLECTION", "conversation_history")
+DEFAULT_USER_ID: str = os.getenv("DEFAULT_USER_ID", "demo_user_123")
 
-# ---------- App ----------
-APP_ENV: str = os.getenv("APP_ENV", "development")
-BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
-DEFAULT_USER_ID: str = os.getenv("DEFAULT_USER_ID", "demo_user")
+if not GEMINI_API_KEY and LLM_PROVIDER == "gemini":
+    print("WARNING: GEMINI_API_KEY is not set.")
+if not MONGODB_ATLAS_URI:
+    print("WARNING: MONGO_URI is not set. Memory features will crash when used.")

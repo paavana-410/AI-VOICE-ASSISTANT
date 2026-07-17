@@ -66,6 +66,23 @@ async def list_memories(user_id: str = Query(default=DEFAULT_USER_ID)):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+class AddMemoryRequest(BaseModel):
+    memory: str
+
+@router.post("/memories", response_model=MemoryItem)
+async def add_memory(
+    body: AddMemoryRequest,
+    user_id: str = Query(default=DEFAULT_USER_ID),
+):
+    """Add a new memory manually."""
+    try:
+        mem = get_memory_client()
+        result = mem.add(messages=body.memory, user_id=user_id)
+        return MemoryItem(id=str(result.get("id", "")), memory=body.memory, user_id=user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/memories/search", response_model=list[MemoryItem])
 async def search_memories(
     q: str = Query(..., description="Search query"),

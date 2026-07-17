@@ -14,13 +14,15 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Optional
 
-from langchain_groq import ChatGroq
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.messages import HumanMessage, SystemMessage
 from mem0 import Memory
 
 from app.config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
     GROQ_API_KEY,
     GROQ_MODEL,
+    LLM_PROVIDER,
     MONGODB_ATLAS_URI,
     MONGODB_DB_NAME,
     MEMORY_COLLECTION,
@@ -32,7 +34,7 @@ from app.config import (
 # ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
-def get_memory_client() -> Memory:
+def get_memory_client() -> Optional[Memory]:
     """
     Configure Mem0 with:
       - MongoDB Atlas as the vector store (native support, no custom adapter)
@@ -41,6 +43,17 @@ def get_memory_client() -> Memory:
     ⚠️  The Atlas vector search index MUST be created manually with dimensions=384
         before calling this function.  See README.md → Atlas Setup.
     """
+    if not MONGODB_ATLAS_URI:
+        return None
+    llm_provider = "google" if LLM_PROVIDER == "gemini" else "groq"
+    llm_config = {
+        "provider": llm_provider,
+        "config": {
+            "model": GEMINI_MODEL if LLM_PROVIDER == "gemini" else GROQ_MODEL,
+            "api_key": GEMINI_API_KEY if LLM_PROVIDER == "gemini" else GROQ_API_KEY,
+        },
+    }
+
     config = {
         "vector_store": {
             "provider": "mongodb",
@@ -60,29 +73,31 @@ def get_memory_client() -> Memory:
                 "model": "sentence-transformers/all-MiniLM-L6-v2",
             },
         },
-        "llm": {
-            # Mem0 uses its own LLM for memory extraction — we reuse Groq here too
-            "provider": "groq",
-            "config": {
-                "model": GROQ_MODEL,
-                "api_key": GROQ_API_KEY,
-            },
-        },
+        "llm": llm_config,
     }
     return Memory.from_config(config)
 
 
 # ---------------------------------------------------------------------------
-# LangChain ChatGroq client — singleton
+# LangChain LLM client — singleton
 # ---------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
-def get_llm() -> ChatGroq:
-    return ChatGroq(
-        api_key=GROQ_API_KEY,
-        model_name=GROQ_MODEL,
-        temperature=0.7,
-    )
+def get_llm():
+    if LLM_PROVIDER == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            google_api_key=GEMINI_API_KEY,
+            model=GEMINI_MODEL,
+            temperature=0.7,
+        )
+    else:
+        from langchain_groq import ChatGroq
+        return ChatGroq(
+            api_key=GROQ_API_KEY,
+            model_name=GROQ_MODEL,
+            temperature=0.7,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -115,12 +130,14 @@ def chat_with_memory(
       5. Return the assistant reply.
     """
     # -- Step 1: retrieve memories --
+    raw_memories = []
     if mcp_client is not None:
         raw_memories = mcp_client.search(user_message, user_id=user_id)
     else:
         mem = get_memory_client()
-        result = mem.search(query=user_message, user_id=user_id, limit=5)
-        raw_memories = result.get("results", result) if isinstance(result, dict) else result
+        if mem is not None:
+            result = mem.search(query=user_message, user_id=user_id, limit=5)
+            raw_memories = result.get("results", result) if isinstance(result, dict) else result
 
     memory_text = _format_memories(raw_memories)
 
@@ -145,7 +162,8 @@ def chat_with_memory(
         )
     else:
         mem = get_memory_client()
-        mem.add(messages=messages_for_mem, user_id=user_id)
+        if mem is not None:
+            mem.add(messages=messages_for_mem, user_id=user_id)
 
     return assistant_reply
 

@@ -15,10 +15,25 @@ from typing import Optional
 
 from crewai import Agent, Crew, Task
 from crewai.tools import tool
-from langchain_groq import ChatGroq
-
-from app.config import GROQ_API_KEY, GROQ_MODEL
 from app.agents.single_agent import get_memory_client
+
+
+def get_crew_llm():
+    from app.config import LLM_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY, GROQ_MODEL
+    if LLM_PROVIDER == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            google_api_key=GEMINI_API_KEY,
+            model=GEMINI_MODEL,
+            temperature=0.5,
+        )
+    else:
+        from langchain_groq import ChatGroq
+        return ChatGroq(
+            api_key=GROQ_API_KEY,
+            model_name=GROQ_MODEL,
+            temperature=0.5,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +77,7 @@ def _make_memory_tools(user_id: str):
 # ---------------------------------------------------------------------------
 
 def build_crew(user_id: str) -> Crew:
-    llm = ChatGroq(api_key=GROQ_API_KEY, model_name=GROQ_MODEL, temperature=0.5)
+    llm = get_crew_llm()
 
     memory_search_tool, memory_add_tool, web_search_tool = _make_memory_tools(user_id)
 
@@ -116,7 +131,7 @@ def run_crew(user_message: str, user_id: str) -> str:
       1. Researcher searches the web (stub) and stores new facts.
       2. Assistant retrieves memories and crafts the final reply.
     """
-    llm = ChatGroq(api_key=GROQ_API_KEY, model_name=GROQ_MODEL, temperature=0.5)
+    llm = get_crew_llm()
     memory_search_tool, memory_add_tool, web_search_tool = _make_memory_tools(user_id)
 
     researcher = Agent(

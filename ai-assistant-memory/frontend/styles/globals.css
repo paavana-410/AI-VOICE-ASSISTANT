@@ -1,0 +1,81 @@
+/* globals.css – design tokens and base styles */
+
+/* Palette */
+:root {
+  --bg-base: #0d0f14;
+  --bg-surface: #161920;
+  --bg-elevated: #1e2230;
+  --bg-card: #252a3a;
+  --accent: #7c6af7;
+  --accent-light: #a394ff;
+  --accent-glow: rgba(124,106,247,0.25);
+  --danger: #f87171;
+  --success: #34d399;
+  --text-primary: #f1f3f9;
+  --text-secondary: #9aa3b8;
+  --text-muted: #5c6480;
+  --border: rgba(255,255,255,0.07);
+  --border-active: rgba(124,106,247,0.45);
+
+  /* Typography */
+  --font: 'Inter', system-ui, sans-serif;
+
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur-med: 300ms;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-card);
+  border-radius: 3px;
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+.justify-center {
+  justify-content: center;
+}
+.items-center {
+  align-items: center;
+}
+
+/* Simple fade‑in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in {
+  animation: fadeIn var(--dur-med) var(--ease) forwards;
+}

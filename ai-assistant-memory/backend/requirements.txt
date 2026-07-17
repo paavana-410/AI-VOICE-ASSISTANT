@@ -1,29 +1,13 @@
-# ── Core backend framework ──────────────────────────────────────────────────
-fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+google-genai>=2.11.0
 python-dotenv>=1.0.0
-pydantic>=2.0.0
-
-# ── MongoDB Atlas (async) ────────────────────────────────────────────────────
-motor>=3.4.0
-pymongo>=4.7.0
-
-# ── LLM ─────────────────────────────────────────────────────────────────────
-langchain>=0.2.0
-langchain-groq>=0.1.0
-groq>=0.9.0
-
-# ── Memory ───────────────────────────────────────────────────────────────────
-mem0ai>=0.1.0
-
-# ── Embeddings (local, no API cost) ─────────────────────────────────────────
-sentence-transformers>=2.7.0
-
-# ── MCP (Model Context Protocol) ────────────────────────────────────────────
-mcp>=1.0.0
-
-# ── Multi-agent orchestration ────────────────────────────────────────────────
-crewai>=0.55.0
-
-# ── Utilities ────────────────────────────────────────────────────────────────
-httpx>=0.27.0
+mem0ai>=0.1.100
+pymongo[srv]>=4.9.0
+motor>=3.5.0
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-core>=0.3.0
+crewai>=1.0.0
+mcp>=1.2.0
+sentence-transformers>=3.0.0

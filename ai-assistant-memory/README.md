@@ -41,7 +41,8 @@ A full-stack AI assistant with persistent, cross-session memory, exposed through
 
 2. **Environment Variables**:
    - Copy `.env.example` to `.env`
-   - Fill in your `GROQ_API_KEY` and `MONGODB_ATLAS_URI`.
+   - Fill in your `MONGODB_ATLAS_URI`.
+   - Provide either `GEMINI_API_KEY` (recommended for stable free tier) or `GROQ_API_KEY`.
 
 3. **Backend Setup**:
    ```bash

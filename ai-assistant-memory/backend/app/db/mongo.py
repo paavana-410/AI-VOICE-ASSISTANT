@@ -9,40 +9,48 @@ import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.config import MONGODB_ATLAS_URI, MONGODB_DB_NAME, CONVERSATION_COLLECTION
 
-# Lazy singleton client — created once on first use
-_client: AsyncIOMotorClient | None = None
+_client = None
 
-
-def get_client() -> AsyncIOMotorClient:
+def get_client() -> AsyncIOMotorClient | None:
     global _client
+    if not MONGODB_ATLAS_URI:
+        return None
     if _client is None:
         _client = AsyncIOMotorClient(MONGODB_ATLAS_URI)
     return _client
 
 
 def get_db():
-    return get_client()[MONGODB_DB_NAME]
+    client = get_client()
+    return client[MONGODB_DB_NAME] if client else None
 
 
 def get_conversation_collection():
-    return get_db()[CONVERSATION_COLLECTION]
+    db = get_db()
+    return db[CONVERSATION_COLLECTION] if db else None
 
 
 async def save_turn(user_id: str, role: str, content: str) -> None:
     """Append a single conversation turn to the history collection."""
+    col = get_conversation_collection()
+    if col is None:
+        return
     doc = {
         "user_id": user_id,
         "role": role,          # "user" | "assistant"
         "content": content,
         "timestamp": datetime.datetime.utcnow(),
     }
-    await get_conversation_collection().insert_one(doc)
+    await col.insert_one(doc)
 
 
 async def get_history(user_id: str, limit: int = 20) -> list[dict]:
     """Return the N most-recent turns for a user, oldest-first."""
+    col = get_conversation_collection()
+    if col is None:
+        return []
     cursor = (
-        get_conversation_collection()
+        col
         .find({"user_id": user_id}, {"_id": 0})
         .sort("timestamp", -1)
         .limit(limit)
@@ -53,5 +61,8 @@ async def get_history(user_id: str, limit: int = 20) -> list[dict]:
 
 async def clear_history(user_id: str) -> int:
     """Delete all conversation history for a user. Returns deleted count."""
-    result = await get_conversation_collection().delete_many({"user_id": user_id})
+    col = get_conversation_collection()
+    if col is None:
+        return 0
+    result = await col.delete_many({"user_id": user_id})
     return result.deleted_count
