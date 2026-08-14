@@ -28,6 +28,8 @@ from app.config import (
     MONGODB_ATLAS_URI,
     MONGODB_DB_NAME,
     MEMORY_COLLECTION,
+    CEREBRAS_API_KEY,
+    CEREBRAS_MODEL,
 )
 
 
@@ -40,13 +42,31 @@ def get_memory_client() -> Optional[Memory]:
     if not MONGODB_ATLAS_URI:
         return None
 
+    # Mem0 LLM config — cerebras falls back to groq for memory extraction
+    # (Mem0 doesn't natively support cerebras provider yet)
+    if LLM_PROVIDER == "gemini":
+        mem0_llm_provider = "gemini"
+        mem0_model   = GEMINI_MODEL
+        mem0_api_key = GEMINI_API_KEY
+    elif LLM_PROVIDER == "cerebras":
+        # Cerebras uses OpenAI-compatible API — use groq as mem0 extractor
+        # if groq key available, else fall back to gemini
+        mem0_llm_provider = "groq" if GROQ_API_KEY else "gemini"
+        mem0_model   = GROQ_MODEL if GROQ_API_KEY else GEMINI_MODEL
+        mem0_api_key = GROQ_API_KEY if GROQ_API_KEY else GEMINI_API_KEY
+    else:
+        mem0_llm_provider = "groq"
+        mem0_model   = GROQ_MODEL
+        mem0_api_key = GROQ_API_KEY
+
     llm_config = {
-        "provider": "gemini" if LLM_PROVIDER == "gemini" else "groq",
+        "provider": mem0_llm_provider,
         "config": {
-            "model":   GEMINI_MODEL if LLM_PROVIDER == "gemini" else GROQ_MODEL,
-            "api_key": GEMINI_API_KEY if LLM_PROVIDER == "gemini" else GROQ_API_KEY,
+            "model":   mem0_model,
+            "api_key": mem0_api_key,
         },
     }
+
     embedder_config = {
         "provider": "huggingface",
         "config": {"model": "sentence-transformers/all-MiniLM-L6-v2"},
@@ -74,7 +94,14 @@ def get_memory_client() -> Optional[Memory]:
 
 @lru_cache(maxsize=1)
 def get_llm():
-    if LLM_PROVIDER == "gemini":
+    if LLM_PROVIDER == "cerebras":
+        from langchain_cerebras import ChatCerebras
+        return ChatCerebras(
+            api_key=CEREBRAS_API_KEY,
+            model=CEREBRAS_MODEL,
+            temperature=0.7,
+        )
+    elif LLM_PROVIDER == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             google_api_key=GEMINI_API_KEY,

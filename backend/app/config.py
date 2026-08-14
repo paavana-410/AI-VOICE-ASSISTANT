@@ -18,6 +18,9 @@ GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "groq")
 LLAMA_CLOUD_API_KEY: str = os.getenv("LLAMA_CLOUD_API_KEY", "")
 
+CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")
+CEREBRAS_MODEL: str = os.getenv("CEREBRAS_MODEL", "llama3.1-8b")
+
 MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "ai_assistant_db")
 MEMORY_COLLECTION: str = os.getenv("MEMORY_COLLECTION", "memories")
 CONVERSATION_COLLECTION: str = os.getenv("CONVERSATION_COLLECTION", "conversation_history")

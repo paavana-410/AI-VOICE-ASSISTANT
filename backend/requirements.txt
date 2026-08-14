@@ -10,6 +10,8 @@ langchain-google-genai==4.2.7
 langchain-core==1.4.9
 langchain-groq==1.1.3
 langchain-community==0.4.2
+langchain-cerebras==0.8.2
+cerebras-cloud-sdk==1.91.0
 
 # Document ingestion
 pypdf==6.14.2
