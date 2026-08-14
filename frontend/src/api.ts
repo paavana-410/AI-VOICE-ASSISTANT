@@ -345,3 +345,59 @@ export async function deleteDocument(token: string, documentId: string): Promise
   });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
+
+// ── Document Analysis (Phase 2.2) ─────────────────────────────────────────────
+
+export interface TableCard { caption: string; markdown: string; page: number; }
+export interface FigureCard { page: number; description: string; }
+export interface AnalysisCard {
+  title:       string;
+  summary:     string;
+  key_facts:   string[];
+  tables:      TableCard[];
+  figures:     FigureCard[];
+  document_id: string;
+}
+
+export async function analyseDocument(
+  token: string,
+  query: string,
+  documentId?: string,
+): Promise<AnalysisCard> {
+  const res = await fetch('/api/analyse', {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ query, document_id: documentId ?? null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? `Analysis failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Analytics (Phase 2.3) ─────────────────────────────────────────────────────
+
+export interface DailyActivity { date: string; count: number; }
+export interface AnalyticsData {
+  total_memories:      number;
+  memories_this_week:  number;
+  total_documents:     number;
+  total_doc_chunks:    number;
+  table_chunks:        number;
+  image_chunks:        number;
+  total_tasks:         number;
+  done_tasks:          number;
+  pending_tasks:       number;
+  total_sessions:      number;
+  total_messages:      number;
+  recent_activity:     DailyActivity[];
+}
+
+export async function getAnalytics(token: string): Promise<AnalyticsData> {
+  const res = await fetch('/api/analytics', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Analytics failed: ${res.status}`);
+  return res.json();
+}

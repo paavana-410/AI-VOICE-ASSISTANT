@@ -4,14 +4,16 @@ import ChatWindow from '../components/ChatWindow';
 import MemoryInspector from '../components/MemoryInspector';
 import FileUpload from '../components/FileUpload';
 import RightPanel from '../components/RightPanel';
+import Analytics from '../components/Analytics';
 import { useAuth } from '../src/authContext';
 
-type Tab = 'chat' | 'upload' | 'memory';
+type Tab = 'chat' | 'upload' | 'memory' | 'analytics';
 
 const TABS: { id: Tab; label: string; icon: string; desc: string }[] = [
-  { id: 'chat',   label: 'Chat',      icon: '💬', desc: 'AI Assistant' },
-  { id: 'upload', label: 'Documents', icon: '📂', desc: 'Upload & Ingest' },
-  { id: 'memory', label: 'Memories',  icon: '🧠', desc: 'Knowledge Base' },
+  { id: 'chat',      label: 'Chat',       icon: '💬', desc: 'AI Assistant' },
+  { id: 'upload',    label: 'Documents',  icon: '📂', desc: 'Upload & Ingest' },
+  { id: 'memory',    label: 'Memories',   icon: '🧠', desc: 'Knowledge Base' },
+  { id: 'analytics', label: 'Analytics',  icon: '📈', desc: 'Usage & Insights' },
 ];
 
 // ── Hamburger icon ────────────────────────────────────────────────────────────
@@ -243,9 +245,10 @@ export default function Home() {
 
         {/* Content */}
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          {activeTab === 'chat'   && <ChatWindow onRegisterLoader={fn => { loadSessionRef.current = fn; }} />}
-          {activeTab === 'upload' && <FileUpload />}
-          {activeTab === 'memory' && <MemoryInspector />}
+          {activeTab === 'chat'      && <ChatWindow onRegisterLoader={fn => { loadSessionRef.current = fn; }} />}
+          {activeTab === 'upload'    && <FileUpload />}
+          {activeTab === 'memory'    && <MemoryInspector />}
+          {activeTab === 'analytics' && <Analytics />}
         </div>
       </div>
 

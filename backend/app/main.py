@@ -10,6 +10,8 @@ from app.api.image_gen import router as image_gen_router
 from app.api.tasks import router as tasks_router
 from app.api.history import router as history_router
 from app.api.documents import router as documents_router
+from app.api.analyse import router as analyse_router
+from app.api.analytics import router as analytics_router
 from app.auth import router as auth_router
 from app.health import router as health_router
 
@@ -36,6 +38,8 @@ app.include_router(image_gen_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 app.include_router(history_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
+app.include_router(analyse_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 
 if __name__ == "__main__":

@@ -15,7 +15,8 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
-from app.agents.single_agent import chat_with_memory
+from app.agents.single_agent import chat_with_memory  # kept for fallback import
+from app.agents.tool_agent import chat_with_tools
 from app.db.mongo import save_turn, get_history, get_db
 from app.auth import get_current_user_id
 from app.api.history import append_turn_to_session
@@ -106,8 +107,8 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
         context_parts.append(req.message)
         enriched_message = "\n\n".join(context_parts)
 
-        # ── 6. LLM call (sync) — pass doc_context directly ───────────────────
-        reply = chat_with_memory(
+        # ── 6. LLM call — tool-calling agent ─────────────────────────────────
+        reply = chat_with_tools(
             user_message=enriched_message,
             user_id=user_id,
             doc_context=doc_context,
