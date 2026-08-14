@@ -1,0 +1,54 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+backend_venv/
+vector_venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Environment variables containing secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE configurations
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+
+# Test / debug scripts (not part of the app)
+backend/check_*.py
+backend/diag_*.py
+backend/test_*.py
+backend/test_*.ps1
+backend/run_test.ps1
+backend/reupload_test.ps1
+backend/create_test_pdf.py
+backend/mem0ai.py
+backend/core_requirements.txt
+backend/vector_requirements.txt
+
+# Uploaded / generated files
+backend/pdf.pdf
+backend/test_invoice.pdf
+backend/data/document_images/
+backend/data/
+
+# Misc
+scripts/
+*.log
