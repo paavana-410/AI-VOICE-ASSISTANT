@@ -30,6 +30,8 @@ from app.config import (
     MEMORY_COLLECTION,
     CEREBRAS_API_KEY,
     CEREBRAS_MODEL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
 )
 
 
@@ -101,6 +103,18 @@ def get_llm():
             model=CEREBRAS_MODEL,
             temperature=0.7,
         )
+    elif LLM_PROVIDER == "openrouter":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            api_key=OPENROUTER_API_KEY,
+            model=OPENROUTER_MODEL,
+            base_url="https://openrouter.ai/api/v1",
+            temperature=0.7,
+            default_headers={
+                "HTTP-Referer": "https://github.com/paavana-410/AI-VOICE-ASSISTANT",
+                "X-Title": "MemAI Business Assistant",
+            },
+        )
     elif LLM_PROVIDER == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
@@ -108,7 +122,7 @@ def get_llm():
             model=GEMINI_MODEL,
             temperature=0.7,
         )
-    else:
+    else:  # groq (default)
         from langchain_groq import ChatGroq
         return ChatGroq(
             api_key=GROQ_API_KEY,
