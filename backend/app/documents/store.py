@@ -156,7 +156,7 @@ async def search_chunks(
         if not raw:
             raise ValueError("empty")
     except Exception:
-        # Vector index not ready or unavailable — fall back to regex text search
+        # Vector index not ready — fall back to regex text search on document_chunks
         import re
         filter_q: dict = {}
         if document_id:
@@ -167,9 +167,17 @@ async def search_chunks(
                 "$regex": "|".join(re.escape(w) for w in words[:8]),
                 "$options": "i",
             }
+        # Sort by _id descending = most recent first
         raw = await col.find(
             filter_q, {"embedding": 0, "_id": 0}
-        ).limit(top_k).to_list(top_k)
+        ).sort("_id", -1).limit(top_k).to_list(top_k)
+
+        # If still empty, return most recent chunks regardless of keyword
+        if not raw:
+            raw = await col.find(
+                {"document_id": document_id} if document_id else {},
+                {"embedding": 0, "_id": 0}
+            ).sort("_id", -1).limit(top_k).to_list(top_k)
 
     # ── Context stitching ─────────────────────────────────────────────────────
     seen_ids: set[str] = set()
