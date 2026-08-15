@@ -150,6 +150,7 @@ def chunk_elements(
         chunks.append({
             "chunk_id":        cid,
             "document_id":     document_id,
+            "filename":        document_id,  # overwritten by upload endpoint with real filename
             "page_number":     buffer_page,
             "section_heading": current_heading,
             "chunk_type":      "text",

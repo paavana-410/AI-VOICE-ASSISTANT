@@ -22,7 +22,7 @@ from app.config import LLM_PROVIDER
 TOOL_CAPABLE = {"groq", "openrouter", "gemini", "cerebras"}
 
 SYSTEM = """\
-You are ARIA — an Advanced Reasoning Intelligence Assistant for business and personal productivity.
+You are TESS — an Advanced Reasoning Intelligence Assistant for business and personal productivity.
 You are the user's chief of staff, analyst, and personal advisor.
 
 You have tools available. Use them when appropriate:

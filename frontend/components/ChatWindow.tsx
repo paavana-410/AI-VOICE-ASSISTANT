@@ -309,7 +309,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '4rem', animation: 'fadeUp 0.5s var(--ease)' }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(34,211,238,0.1) 100%)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.25rem', boxShadow: '0 8px 32px rgba(99,102,241,0.15)' }}>🧠</div>
-            <p style={{ fontFamily: 'var(--font-head)', fontSize: '1.05rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>ARIA — Business AI Assistant</p>
+            <p style={{ fontFamily: 'var(--font-head)', fontSize: '1.05rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>TESS — Business AI Assistant</p>
             <p style={{ fontSize: '0.78rem', marginBottom: '1.5rem', opacity: 0.6 }}>Chat · Upload Files · Voice · Image Generation</p>
             <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
               {[
@@ -338,7 +338,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                 {m.role === 'assistant' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
                     <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>✦</div>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: '500', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ARIA</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: '500', letterSpacing: '0.04em', textTransform: 'uppercase' }}>TESS</span>
                   </div>
                 )}
                 <div style={{
@@ -513,7 +513,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             placeholder={
               isListening ? '🎙️  Listening...' :
               stagedFiles.length > 0 ? 'Add a message or just hit send…' :
-              'Message ARIA or attach a file…'
+              'Message TESS or attach a file…'
             }
             disabled={isListening}
             style={{

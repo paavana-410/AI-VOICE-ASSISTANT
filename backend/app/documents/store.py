@@ -94,6 +94,7 @@ async def store_chunk(chunk: dict) -> None:
     doc = {
         "chunk_id":        chunk["chunk_id"],
         "document_id":     chunk["document_id"],
+        "filename":        chunk.get("filename", ""),
         "page_number":     chunk["page_number"],
         "section_heading": chunk["section_heading"],
         "chunk_type":      chunk["chunk_type"],

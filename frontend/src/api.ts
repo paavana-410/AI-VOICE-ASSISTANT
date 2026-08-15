@@ -401,3 +401,23 @@ export async function getAnalytics(token: string): Promise<AnalyticsData> {
   if (!res.ok) throw new Error(`Analytics failed: ${res.status}`);
   return res.json();
 }
+
+// ── Stored document summaries ─────────────────────────────────────────────────
+
+export interface StoredDocument {
+  document_id: string;
+  filename:    string;
+  chunk_count: number;
+  table_count: number;
+  image_count: number;
+  text_count:  number;
+  uploaded_at: string;
+}
+
+export async function listDocuments(token: string): Promise<StoredDocument[]> {
+  const res = await fetch('/api/documents/summary', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to list documents: ${res.status}`);
+  return res.json();
+}
