@@ -330,7 +330,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         )}
 
         {messages.map(m => (
-          <div key={m.id} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : m.role === 'system' ? 'center' : 'flex-start', animation: 'fadeUp 0.2s var(--ease)' }}>
+          <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : m.role === 'system' ? 'center' : 'flex-start', animation: 'fadeUp 0.2s var(--ease)' }}>
             {m.role === 'system' ? (
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0.35rem 0.85rem', borderRadius: '999px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', fontStyle: 'italic' }}>{m.content}</div>
             ) : (
@@ -358,6 +358,18 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                     </div>
                   )}
                 </div>
+                {/* Action buttons below message */}
+                <MessageActions
+                  message={m}
+                  onEdit={text => { setInput(text); }}
+                  onRegenerate={m.role === 'assistant' ? () => {
+                    // Find the preceding user message and resend it
+                    const msgs = messages;
+                    const idx = msgs.findIndex(x => x.id === m.id);
+                    const prev = msgs.slice(0, idx).reverse().find(x => x.role === 'user');
+                    if (prev) handleSend(prev.content);
+                  } : undefined}
+                />
               </div>
             )}
           </div>
@@ -540,6 +552,54 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           >↑</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Message action buttons ────────────────────────────────────────────────────
+function MessageActions({ message, onEdit, onRegenerate }: {
+  message: { role: string; content: string };
+  onEdit?: (text: string) => void;
+  onRegenerate?: () => void;
+}) {
+  const [copied, setCopied] = React.useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  const btn: React.CSSProperties = {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--text-muted)', fontSize: '0.7rem',
+    padding: '0.2rem 0.5rem', borderRadius: '4px',
+    display: 'flex', alignItems: 'center', gap: '0.25rem',
+    fontFamily: 'var(--font-body)', transition: 'all 0.12s',
+  };
+
+  return (
+    <div className="msg-actions" style={{ display: 'flex', gap: '0.1rem', marginTop: '0.3rem', opacity: 0, transition: 'opacity 0.15s' }}>
+      <button style={btn} onClick={copy}
+        onMouseEnter={e => { e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.background='rgba(255,255,255,0.05)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.background='none'; }}>
+        {copied ? '✓ Copied' : '⧉ Copy'}
+      </button>
+      {onEdit && message.role === 'user' && (
+        <button style={btn} onClick={() => onEdit(message.content)}
+          onMouseEnter={e => { e.currentTarget.style.color='var(--text-secondary)'; e.currentTarget.style.background='rgba(255,255,255,0.05)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.background='none'; }}>
+          ✏ Edit
+        </button>
+      )}
+      {onRegenerate && message.role === 'assistant' && (
+        <button style={btn} onClick={onRegenerate}
+          onMouseEnter={e => { e.currentTarget.style.color='var(--accent-light)'; e.currentTarget.style.background='rgba(99,102,241,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color='var(--text-muted)'; e.currentTarget.style.background='none'; }}>
+          ↺ Regenerate
+        </button>
+      )}
     </div>
   );
 }

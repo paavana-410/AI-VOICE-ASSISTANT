@@ -355,3 +355,8 @@ body::after {
   box-shadow: var(--shadow-md);
 }
 [data-tooltip]:hover::after { opacity: 1; }
+
+/* ── Message action buttons — show on hover ────────────────────────────── */
+.msg-actions { opacity: 0; transition: opacity 0.15s; }
+div:hover > div > .msg-actions,
+div:hover > .msg-actions { opacity: 1 !important; }
