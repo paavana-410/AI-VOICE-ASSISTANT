@@ -12,6 +12,10 @@ langchain-groq==1.1.3
 langchain-community==0.4.2
 langchain-cerebras==0.8.2
 cerebras-cloud-sdk==1.91.0
+langchain-openai==1.5.0
+
+# LlamaParse — layout-aware PDF parsing (free 1000 pages/day)
+llama-parse==0.6.4
 
 # Document ingestion
 pypdf==6.14.2
