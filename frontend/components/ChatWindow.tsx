@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../src/authContext';
-import { sendChatMessage, generateImage, ingestFile } from '../src/api';
+import { sendChatMessage, generateImage, ingestFile, uploadDocument } from '../src/api';
 
 type MessageRole = 'user' | 'assistant' | 'system';
 interface Message { id: number; role: MessageRole; content: string; imageUrl?: string; }
@@ -154,16 +154,33 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         setMessages(p => [...p, { id: uid, role: 'user', content: `📎 ${sf.file.name}` }]);
 
         const uploadingId = (() => { msgId++; return msgId; })();
-        setMessages(p => [...p, { id: uploadingId, role: 'system', content: `⏳ Uploading "${sf.file.name}"...` }]);
+        const isPdf = sf.file.name.toLowerCase().endsWith('.pdf');
+        setMessages(p => [...p, { id: uploadingId, role: 'system', content: `⏳ ${isPdf ? 'Parsing PDF (tables, images, text)…' : `Uploading "${sf.file.name}"…`}` }]);
 
         try {
-          const r = await ingestFile(accessToken, sf.file);
-          setMessages(p => p.map(m =>
-            m.id === uploadingId
-              ? { ...m, content: `✅ "${r.filename}" stored — ${r.chunks_stored} chunk(s) saved to memory` }
-              : m
-          ));
-          if (voiceEnabled) speak(`${r.filename} saved to memory.`, selectedVoice);
+          if (isPdf) {
+            // Full LlamaParse pipeline — extracts tables, images, structured text
+            const r = await uploadDocument(accessToken, sf.file, (pct) => {
+              setMessages(p => p.map(m =>
+                m.id === uploadingId ? { ...m, content: `⏳ Parsing PDF… ${pct}%` } : m
+              ));
+            });
+            setMessages(p => p.map(m =>
+              m.id === uploadingId
+                ? { ...m, content: `✅ "${r.filename}" fully parsed — ${r.chunks.text} text · ${r.chunks.table} table${r.chunks.table !== 1 ? 's' : ''} · ${r.chunks.image_caption} image${r.chunks.image_caption !== 1 ? 's' : ''} stored` }
+                : m
+            ));
+            if (voiceEnabled) speak(`${r.filename} parsed with ${r.chunks.total} chunks saved.`, selectedVoice);
+          } else {
+            // All other file types — fast local ingest
+            const r = await ingestFile(accessToken, sf.file);
+            setMessages(p => p.map(m =>
+              m.id === uploadingId
+                ? { ...m, content: `✅ "${r.filename}" stored — ${r.chunks_stored} chunk(s) saved to memory` }
+                : m
+            ));
+            if (voiceEnabled) speak(`${r.filename} saved to memory.`, selectedVoice);
+          }
         } catch (err: any) {
           setMessages(p => p.map(m =>
             m.id === uploadingId
@@ -449,7 +466,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && canSend) { e.preventDefault(); handleSend(); } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && canSend && !isLoading) { e.preventDefault(); handleSend(); } }}
             placeholder={
               isListening ? '🎙️  Listening...' :
               stagedFiles.length > 0 ? 'Add a message or just hit send…' :

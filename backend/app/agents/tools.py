@@ -107,42 +107,99 @@ def make_tools(user_id: str) -> list:
         """Search uploaded business documents for information. Use when asked about
         uploaded files, reports, invoices, or any document content."""
         async def _go():
-            from app.documents.store import search_chunks
-            return await search_chunks(query, top_k=4)
-        chunks = _run(_go())
-        if not chunks:
+            import re
+            results = []
+            from app.db.mongo import get_db
+            db = get_db()
+
+            # Path 1: document_chunks collection (LlamaParse pipeline)
+            try:
+                from app.documents.store import search_chunks
+                chunks = await search_chunks(query, top_k=4)
+                for c in chunks:
+                    label = f"[Page {c.get('page_number','?')}] ({c.get('chunk_type','text')})"
+                    results.append(f"{label}\n{c['content'][:500]}")
+            except Exception:
+                pass
+
+            # Path 2: mem0_memories collection (ingest/+ button path)
+            if db is not None and len(results) < 3:
+                try:
+                    words = [w for w in query.split() if len(w) > 3]
+                    if words:
+                        regex = "|".join(re.escape(w) for w in words[:6])
+                        # search 'memory' field (how direct inserts store it)
+                        docs = await db["mem0_memories"].find(
+                            {"user_id": user_id, "memory": {"$regex": regex, "$options": "i"}},
+                            {"_id": 0, "memory": 1, "metadata": 1}
+                        ).limit(5).to_list(5)
+                        for d in docs:
+                            src = d.get("metadata", {}).get("source", "uploaded file") if isinstance(d.get("metadata"), dict) else "uploaded file"
+                            results.append(f"[{src}]\n{d.get('memory','')[:500]}")
+                except Exception:
+                    pass
+
+            return results
+
+        results = _run(_go())
+        if not results:
             return "No relevant content found in uploaded documents."
-        parts = []
-        for c in chunks:
-            label = f"[Page {c.get('page_number','?')}] ({c.get('chunk_type','text')})"
-            parts.append(f"{label}\n{c['content'][:500]}")
-        return "\n\n---\n\n".join(parts)
+        return "\n\n---\n\n".join(results)
 
     @tool
     def summarise_document(topic: str) -> str:
         """Generate a structured summary of uploaded documents on a given topic.
         Use when user asks to 'summarise', 'give an overview', or 'analyse' a document.
-        topic: keyword describing the document e.g. 'carbon emissions', 'invoice'."""
+        topic: keyword describing the document e.g. 'carbon emissions', 'invoice', 'sales'."""
         async def _go():
-            from app.documents.store import search_chunks
-            return await search_chunks(topic, top_k=10)
+            import re
+            results = []
+            from app.db.mongo import get_db
+            db = get_db()
+
+            # Path 1: document_chunks (structured — tables, images, text)
+            try:
+                from app.documents.store import search_chunks
+                chunks = await search_chunks(topic, top_k=10)
+                results.extend(chunks)
+            except Exception:
+                pass
+
+            # Path 2: mem0_memories (flat chunks from ingest)
+            if db is not None:
+                try:
+                    words = [w for w in topic.split() if len(w) > 2]
+                    regex = "|".join(re.escape(w) for w in words[:8]) if words else topic
+                    docs = await db["mem0_memories"].find(
+                        {"user_id": user_id, "memory": {"$regex": regex, "$options": "i"}},
+                        {"_id": 0, "memory": 1, "metadata": 1}
+                    ).limit(10).to_list(10)
+                    for d in docs:
+                        src = d.get("metadata", {}).get("source", "uploaded file") if isinstance(d.get("metadata"), dict) else "uploaded file"
+                        results.append({"chunk_type": "text", "content": d.get("memory", ""), "source": src})
+                except Exception:
+                    pass
+
+            return results
+
         chunks = _run(_go())
         if not chunks:
-            return f"No documents found related to '{topic}'."
+            return f"No documents found related to '{topic}'. Try uploading a document first."
 
-        text_chunks  = [c for c in chunks if c.get("chunk_type") == "text"]
+        text_chunks  = [c for c in chunks if c.get("chunk_type") in ("text", None) or "chunk_type" not in c]
         table_chunks = [c for c in chunks if c.get("chunk_type") == "table"]
         img_chunks   = [c for c in chunks if c.get("chunk_type") == "image_caption"
-                        and "unavailable" not in c.get("content", "")
-                        and "[Image on page" not in c.get("content", "")]
+                        and "unavailable" not in c.get("content", "")]
 
-        parts = [f"**Summary: {topic}**"]
+        parts = [f"**Document Summary: {topic}**"]
         if text_chunks:
-            parts.append("**Key Points:**")
-            for c in text_chunks[:4]:
-                parts.append(f"• {c['content'][:250]}")
+            parts.append("**Key Content:**")
+            for c in text_chunks[:5]:
+                src = c.get("source", "")
+                prefix = f"[{src}] " if src else ""
+                parts.append(f"• {prefix}{c.get('content','')[:300]}")
         if table_chunks:
-            parts.append("**Tables:**")
+            parts.append("**Tables Found:**")
             for i, c in enumerate(table_chunks, 1):
                 parts.append(f"Table {i} (p{c.get('page_number','?')}):\n{c['content'][:600]}")
         if img_chunks:
