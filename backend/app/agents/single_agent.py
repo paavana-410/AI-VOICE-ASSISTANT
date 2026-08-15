@@ -44,19 +44,15 @@ def get_memory_client() -> Optional[Memory]:
     if not MONGODB_ATLAS_URI:
         return None
 
-    # Mem0 LLM config — cerebras falls back to groq for memory extraction
-    # (Mem0 doesn't natively support cerebras provider yet)
+    # Mem0 LLM config — use groq if available, else gemini
+    # If both exhausted, use a minimal config that skips LLM extraction
     if LLM_PROVIDER == "gemini":
         mem0_llm_provider = "gemini"
         mem0_model   = GEMINI_MODEL
         mem0_api_key = GEMINI_API_KEY
-    elif LLM_PROVIDER == "cerebras":
-        # Cerebras uses OpenAI-compatible API — use groq as mem0 extractor
-        # if groq key available, else fall back to gemini
-        mem0_llm_provider = "groq" if GROQ_API_KEY else "gemini"
-        mem0_model   = GROQ_MODEL if GROQ_API_KEY else GEMINI_MODEL
-        mem0_api_key = GROQ_API_KEY if GROQ_API_KEY else GEMINI_API_KEY
     else:
+        # For groq/cerebras/openrouter: use groq for Mem0 extraction
+        # (Mem0 doesn't support cerebras/openrouter natively)
         mem0_llm_provider = "groq"
         mem0_model   = GROQ_MODEL
         mem0_api_key = GROQ_API_KEY
@@ -130,7 +126,6 @@ def get_llm():
             temperature=0.7,
         )
 
-
 # ---------------------------------------------------------------------------
 # System prompt
 # ---------------------------------------------------------------------------
@@ -190,23 +185,26 @@ def chat_with_memory(
         If provided, uses MCP for memory operations; otherwise uses Mem0 directly.
     """
 
-    # -- Step 1: retrieve conversational memories (Mem0, sync) ---------------
+    # -- Step 1: retrieve conversational memories (best-effort) ---------------
     raw_memories = []
-    if mcp_client is not None:
-        raw_memories = mcp_client.search(user_message, user_id=user_id)
-    else:
-        mem = get_memory_client()
-        if mem is not None:
-            result = mem.search(
-                query=user_message,
-                filters={"user_id": user_id},
-                limit=5,
-            )
-            raw_memories = (
-                result.get("results", result)
-                if isinstance(result, dict)
-                else result
-            )
+    try:
+        if mcp_client is not None:
+            raw_memories = mcp_client.search(user_message, user_id=user_id)
+        else:
+            mem = get_memory_client()
+            if mem is not None:
+                result = mem.search(
+                    query=user_message,
+                    filters={"user_id": user_id},
+                    limit=5,
+                )
+                raw_memories = (
+                    result.get("results", result)
+                    if isinstance(result, dict)
+                    else result
+                )
+    except Exception:
+        raw_memories = []  # degrade gracefully if Mem0 is unavailable
 
     memory_text = _format_memories(raw_memories)
 
@@ -222,20 +220,23 @@ def chat_with_memory(
     response = llm.invoke([system_msg, human_msg])
     assistant_reply: str = response.content
 
-    # -- Step 4: save new facts to Mem0 ---------------------------------------
+    # -- Step 4: save new facts to Mem0 (best-effort — never crash chat) ----
     messages_for_mem = [
         {"role": "user",      "content": user_message},
         {"role": "assistant", "content": assistant_reply},
     ]
-    if mcp_client is not None:
-        mcp_client.add(
-            content=f"User said: {user_message}\nAssistant replied: {assistant_reply}",
-            user_id=user_id,
-        )
-    else:
-        mem = get_memory_client()
-        if mem is not None:
-            mem.add(messages=messages_for_mem, user_id=user_id)
+    try:
+        if mcp_client is not None:
+            mcp_client.add(
+                content=f"User said: {user_message}\nAssistant replied: {assistant_reply}",
+                user_id=user_id,
+            )
+        else:
+            mem = get_memory_client()
+            if mem is not None:
+                mem.add(messages=messages_for_mem, user_id=user_id)
+    except Exception:
+        pass  # Never crash chat due to Mem0 LLM rate limits
 
     return assistant_reply
 

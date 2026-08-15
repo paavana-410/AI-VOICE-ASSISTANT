@@ -19,7 +19,7 @@ from app.agents.single_agent import get_llm, get_memory_client, _format_memories
 from app.agents.tools import make_tools
 from app.config import LLM_PROVIDER
 
-TOOL_CAPABLE = {"groq", "openrouter", "gemini"}
+TOOL_CAPABLE = {"groq", "openrouter", "gemini", "cerebras"}
 
 SYSTEM = """\
 You are ARIA — an Advanced Reasoning Intelligence Assistant for business and personal productivity.
@@ -63,20 +63,17 @@ def chat_with_tools(
             mcp_client=mcp_client,
         )
 
-    # ── Retrieve memories ─────────────────────────────────────────────────────
+    # ── Retrieve memories (best-effort) ──────────────────────────────────────
     raw_memories = []
     mem = get_memory_client()
-    if mcp_client is not None:
-        try:
+    try:
+        if mcp_client is not None:
             raw_memories = mcp_client.search(user_message, user_id=user_id)
-        except Exception:
-            pass
-    elif mem is not None:
-        try:
+        elif mem is not None:
             result = mem.search(query=user_message, filters={"user_id": user_id}, limit=5)
             raw_memories = result.get("results", result) if isinstance(result, dict) else result
-        except Exception:
-            pass
+    except Exception:
+        raw_memories = []
     memory_text = _format_memories(raw_memories)
 
     # ── Set up tools + LLM ────────────────────────────────────────────────────
@@ -137,7 +134,7 @@ def chat_with_tools(
     if not reply:
         reply = "I completed your request."
 
-    # ── Save to memory ────────────────────────────────────────────────────────
+    # ── Save to memory (best-effort) ─────────────────────────────────────────
     try:
         msgs = [{"role": "user", "content": user_message}, {"role": "assistant", "content": reply}]
         if mcp_client is not None:
@@ -145,6 +142,6 @@ def chat_with_tools(
         elif mem is not None:
             mem.add(messages=msgs, user_id=user_id)
     except Exception:
-        pass
+        pass  # Never crash chat due to Mem0 rate limits
 
     return reply
