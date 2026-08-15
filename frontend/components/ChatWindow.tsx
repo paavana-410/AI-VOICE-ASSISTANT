@@ -36,7 +36,7 @@ function pickUSFemaleVoice(voices: SpeechSynthesisVoice[]) {
     ?? voices[0] ?? null;
 }
 
-function speak(text: string, voice: SpeechSynthesisVoice | null) {
+function speak(text: string, voice: SpeechSynthesisVoice | null, onStart?: () => void, onEnd?: () => void) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const clean = text.replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
@@ -44,6 +44,9 @@ function speak(text: string, voice: SpeechSynthesisVoice | null) {
   const u = new SpeechSynthesisUtterance(clean);
   if (voice) u.voice = voice;
   u.lang = voice?.lang ?? 'en-US'; u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
+  u.onstart = () => onStart?.();
+  u.onend   = () => onEnd?.();
+  u.onerror = () => onEnd?.();
   window.speechSynthesis.speak(u);
 }
 
@@ -74,6 +77,8 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   const [stagedFiles, setStagedFiles]   = useState<StagedFile[]>([]);   // ← staged, not uploaded
   const [isCrew, setIsCrew]             = useState(false);
   const [isLoading, setIsLoading]       = useState(false);
+  const [isSpeaking, setIsSpeaking]     = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const [isListening, setIsListening]   = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [speechOk, setSpeechOk]         = useState(false);
@@ -118,7 +123,18 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
     msgId++; setMessages(p => [...p, { id: msgId, role, content, imageUrl }]); return msgId;
   }, []);
 
-  // ── Stage files (picked but NOT uploaded yet) ─────────────────────────────
+  // ── Stop generation ───────────────────────────────────────────────────────
+  const stopGeneration = useCallback(() => {
+    abortRef.current?.abort();
+    setIsLoading(false);
+    addMsg('system', '⏹ Response stopped.');
+  }, [addMsg]);
+
+  // ── Stop audio ─────────────────────────────────────────────────────────────
+  const stopAudio = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  }, []);
   const stageFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
     setShowAttach(false);
@@ -203,12 +219,16 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             ...p.filter(m => m.role !== 'system'),
             { id: msgId, role: 'assistant', content: `Here's your image: **${imgPrompt}**`, imageUrl: r.url },
           ]);
-          if (voiceEnabled) speak(`Here's your image of ${imgPrompt}`, selectedVoice);
+          if (voiceEnabled) speak(`Here's your image of ${imgPrompt}`, selectedVoice, () => setIsSpeaking(true), () => setIsSpeaking(false));
         } else {
+          // Use AbortController so user can cancel mid-request
+          const controller = new AbortController();
+          abortRef.current = controller;
           const r = await sendChatMessage(accessToken, text, isCrew, sessionId);
+          abortRef.current = null;
           addMsg('assistant', r.reply);
           if (r.session_id) setSessionId(r.session_id);
-          if (voiceEnabled) speak(r.reply, selectedVoice);
+          if (voiceEnabled) speak(r.reply, selectedVoice, () => setIsSpeaking(true), () => setIsSpeaking(false));
         }
       } else if (hasFiles) {
         // Files only — confirm upload with a brief assistant reply
@@ -252,13 +272,36 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         background: 'rgba(13,15,24,0.7)', backdropFilter: 'blur(10px)', flexShrink: 0,
       }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-muted)', userSelect: 'none' }}>
-          <input type="checkbox" checked={voiceEnabled} onChange={() => { if (voiceEnabled) window.speechSynthesis?.cancel(); setVoiceEnabled(!voiceEnabled); }} style={{ accentColor: 'var(--accent-2)' }} />
+          <input type="checkbox" checked={voiceEnabled} onChange={() => { if (voiceEnabled) { window.speechSynthesis?.cancel(); setIsSpeaking(false); } setVoiceEnabled(!voiceEnabled); }} style={{ accentColor: 'var(--accent-2)' }} />
           🔊 Voice
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-muted)', userSelect: 'none' }}>
           <input type="checkbox" checked={isCrew} onChange={() => setIsCrew(!isCrew)} style={{ accentColor: 'var(--accent-2)' }} />
           🤖 Multi-Agent
         </label>
+
+        {/* Stop audio button — shown while speaking */}
+        {isSpeaking && (
+          <button onClick={stopAudio} style={{
+            padding: '0.3rem 0.7rem', borderRadius: '999px', border: '1px solid rgba(239,68,68,0.4)',
+            background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer',
+            fontSize: '0.75rem', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.3rem',
+            animation: 'pulsing 1.5s ease-in-out infinite',
+          }}>
+            ⏹ Stop audio
+          </button>
+        )}
+
+        {/* Stop generation button — shown while loading */}
+        {isLoading && (
+          <button onClick={stopGeneration} style={{
+            padding: '0.3rem 0.7rem', borderRadius: '999px', border: '1px solid rgba(245,158,11,0.4)',
+            background: 'rgba(245,158,11,0.1)', color: '#f59e0b', cursor: 'pointer',
+            fontSize: '0.75rem', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.3rem',
+          }}>
+            ⏹ Stop
+          </button>
+        )}
       </div>
 
       {/* Messages */}
