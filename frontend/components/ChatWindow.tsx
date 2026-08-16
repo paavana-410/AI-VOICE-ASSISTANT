@@ -176,10 +176,12 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
     window.speechSynthesis?.cancel();
     setIsSpeaking(false);
   }, []);
-  const stageFiles = useCallback((files: FileList | null) => {
-    if (!files?.length) return;
+  const stageFiles = useCallback((files: FileList | File[] | null) => {
+    if (!files) return;
+    const arr = Array.from(files);
+    if (!arr.length) return;
     setShowAttach(false);
-    const incoming: StagedFile[] = Array.from(files).map(file => {
+    const incoming: StagedFile[] = arr.map(file => {
       fileIdCounter++;
       return { file, id: fileIdCounter };
     });
@@ -646,6 +648,23 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onPaste={e => {
+              const items = Array.from(e.clipboardData?.items ?? []);
+              const fileItems = items.filter(it => it.kind === 'file');
+              if (fileItems.length === 0) return; // plain text paste — let browser handle normally
+              e.preventDefault(); // block default paste for file items
+              const toStage: File[] = fileItems.map((it, idx) => {
+                const raw = it.getAsFile();
+                if (!raw) return null;
+                // Screenshot images have a generic name like "image.png" — make it unique
+                const ext = raw.type.split('/')[1] || 'png';
+                const name = raw.name && raw.name !== 'image.png' && raw.name !== 'blob'
+                  ? raw.name
+                  : `screenshot_${Date.now()}${idx > 0 ? `_${idx}` : ''}.${ext}`;
+                return new File([raw], name, { type: raw.type });
+              }).filter(Boolean) as File[];
+              if (toStage.length > 0) stageFiles(toStage);
+            }}
             placeholder={
               isListening ? '🎙️  Listening...' :
               stagedFiles.length > 0 ? 'Add a message or just hit send…' :
