@@ -211,14 +211,16 @@ async def _parse_image(data: bytes, filename: str) -> str:
         {"inline_data": {"mime_type": mime, "data": b64}},
         {"text": "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."},
     ]}]}
+    models_to_try = list(dict.fromkeys([GEMINI_MODEL, "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"]))
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}",
-                json=payload,
-            )
-        if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        async with httpx.AsyncClient(timeout=20) as client:
+            for model in models_to_try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+                r = await client.post(url, json=payload)
+                if r.status_code == 200:
+                    text_out = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if text_out:
+                        return f"[Image Content ({filename})]: {text_out}"
     except Exception:
         pass
     size = f"{len(data)//1024}KB"
