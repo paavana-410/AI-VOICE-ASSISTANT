@@ -159,8 +159,8 @@ def _build_llm_by_name(provider: str):
         )
     return None
 
-@lru_cache(maxsize=1)
 def get_llm():
+    """Build fresh LLM chain each call — no cache, so provider rotation works after 429s."""
     primary = _build_llm_by_name(LLM_PROVIDER)
     fallbacks = []
     for p in ["cerebras", "gemini", "nvidia", "openrouter", "groq"]:
@@ -168,7 +168,7 @@ def get_llm():
             fb = _build_llm_by_name(p)
             if fb is not None:
                 fallbacks.append(fb)
-    
+
     if primary and fallbacks:
         return primary.with_fallbacks(fallbacks)
     return primary or (fallbacks[0] if fallbacks else None)
@@ -262,10 +262,28 @@ def chat_with_memory(
     ))
     human_msg = HumanMessage(content=user_message)
 
-    # -- Step 3: call LLM -----------------------------------------------------
-    llm = get_llm()
-    response = llm.invoke([system_msg, human_msg])
-    assistant_reply: str = response.content
+    # -- Step 3: call LLM with per-provider retry on 429 ----------------------
+    PROVIDER_ORDER = [LLM_PROVIDER, "cerebras", "gemini", "nvidia", "openrouter", "groq"]
+    seen = set()
+    assistant_reply: str = ""
+    for _p in PROVIDER_ORDER:
+        if _p in seen:
+            continue
+        seen.add(_p)
+        _llm = _build_llm_by_name(_p)
+        if _llm is None:
+            continue
+        try:
+            _resp = _llm.invoke([system_msg, human_msg])
+            assistant_reply = _resp.content
+            break
+        except Exception as _e:
+            err_str = str(_e).lower()
+            if "429" in err_str or "rate" in err_str or "quota" in err_str:
+                continue  # silently try next provider
+            raise  # re-raise non-rate-limit errors
+    if not assistant_reply:
+        assistant_reply = f"### Document Analysis\n\n{doc_context}"
 
     # -- Step 4: save new facts to Mem0 (best-effort — never crash chat) ----
     messages_for_mem = [

@@ -99,25 +99,40 @@ async def call_model_node(state: AgentState):
 
     tools = make_tools(user_id)
 
-    # Try providers with tool binding sequentially — if 429 or network error, fallback to next
+    # Try providers with tool binding sequentially — catch 429/rate/quota silently
     response = None
     for provider in ["nvidia", "gemini", "cerebras", "openrouter", "groq"]:
         bare_llm = _build_llm_by_name(provider)
-        if bare_llm is not None:
+        if bare_llm is None:
+            continue
+        try:
+            llm_with_tools = bare_llm.bind_tools(tools)
+            response = await llm_with_tools.ainvoke(full_messages)
+            if response:
+                break
+        except Exception as _e:
+            err_str = str(_e).lower()
+            if "429" in err_str or "rate" in err_str or "quota" in err_str or "overloaded" in err_str:
+                response = None
+                continue
+            response = None  # non-rate error — still try next provider
+
+    # Last resort: plain invocation without tools, fresh provider loop (no cached llm)
+    if response is None:
+        for provider in ["cerebras", "gemini", "nvidia", "openrouter", "groq"]:
+            plain_llm = _build_llm_by_name(provider)
+            if plain_llm is None:
+                continue
             try:
-                llm_with_tools = bare_llm.bind_tools(tools)
-                response = await llm_with_tools.ainvoke(full_messages)
+                response = await plain_llm.ainvoke(full_messages)
                 if response:
                     break
-            except Exception:
-                response = None
+            except Exception as _e:
+                err_str = str(_e).lower()
+                if "429" in err_str or "rate" in err_str or "quota" in err_str or "overloaded" in err_str:
+                    continue
 
-    if response is None:
-        # Plain invocation with full fallback chain
-        full_llm = get_llm()
-        response = await full_llm.ainvoke(full_messages)
-
-    return {"messages": [response]}
+    return {"messages": [response] if response else [AIMessage(content="I'm experiencing high load. Please try again in a moment.")]}
 
 
 async def execute_tools_node(state: AgentState):
