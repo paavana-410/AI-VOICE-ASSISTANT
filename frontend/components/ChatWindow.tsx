@@ -85,6 +85,8 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   const [selectedVoice, setVoice]       = useState<SpeechSynthesisVoice | null>(null);
   const [showAttach, setShowAttach]     = useState(false);
   const [sessionId, setSessionId]       = useState<string | null>(null);
+  // Last uploaded file names — used to auto-include file context in the next chat message
+  const [lastUploadedFiles, setLastUploadedFiles] = useState<string[]>([]);
   // Phase 4 — text-selection popup
   const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; text: string } | null>(null);
 
@@ -248,6 +250,8 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
               : m
           ));
         }
+        // Track uploaded file names for context injection in next message
+        setLastUploadedFiles(currentFiles.map(sf => sf.file.name));
       }
 
       // ── Send text message (if any) ────────────────────────────────────────
@@ -268,9 +272,15 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           // Use AbortController so user can cancel mid-request
           const controller = new AbortController();
           abortRef.current = controller;
-          const queryPayload = currentFiles.length > 0
-            ? `${currentFiles.map(sf => sf.file.name).join(' ')} ${text}`
+          // Include file context: files staged now, OR files just uploaded in this turn
+          const fileContext = currentFiles.length > 0
+            ? currentFiles.map(sf => sf.file.name)
+            : lastUploadedFiles;
+          const queryPayload = fileContext.length > 0
+            ? `${fileContext.join(' ')} ${text}`
             : text;
+          // Clear last uploaded context after using it
+          if (lastUploadedFiles.length > 0) setLastUploadedFiles([]);
           const r = await sendChatMessage(accessToken, queryPayload, isCrew, sessionId);
           abortRef.current = null;
           addMsg('assistant', r.reply);

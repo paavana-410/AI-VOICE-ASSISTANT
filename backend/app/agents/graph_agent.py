@@ -14,8 +14,23 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
-from app.agents.single_agent import get_llm, get_memory_client, _format_memories
+from app.agents.single_agent import get_llm, get_memory_client, _format_memories, _build_llm_by_name
 from app.agents.tools import make_tools
+from app.config import LLM_PROVIDER
+
+
+def _get_bare_llm():
+    """Return a bare (no .with_fallbacks) LLM suitable for bind_tools."""
+    llm = _build_llm_by_name(LLM_PROVIDER)
+    if llm is not None:
+        return llm
+    # Try common fallback providers in order
+    for p in ["groq", "cerebras", "nvidia", "openrouter", "gemini"]:
+        if p != LLM_PROVIDER:
+            llm = _build_llm_by_name(p)
+            if llm is not None:
+                return llm
+    return None
 
 SYSTEM_TEMPLATE = """\
 You are TESS — an Advanced Reasoning Intelligence Assistant for business and personal productivity.
@@ -78,14 +93,22 @@ async def call_model_node(state: AgentState):
         full_messages = [sys_msg] + messages[1:]
 
     tools = make_tools(user_id)
-    llm = get_llm()
+    # Use a bare (non-fallback) LLM for bind_tools — with_fallbacks() chains
+    # don't support bind_tools. Plain invocation uses the full fallback chain.
+    bare_llm = _get_bare_llm()
+    full_llm = get_llm()
 
-    try:
-        llm_with_tools = llm.bind_tools(tools)
-        response = await llm_with_tools.ainvoke(full_messages)
-    except Exception:
-        # Fallback to plain invoke without tool binding if provider fails binding
-        response = await llm.ainvoke(full_messages)
+    response = None
+    if bare_llm is not None:
+        try:
+            llm_with_tools = bare_llm.bind_tools(tools)
+            response = await llm_with_tools.ainvoke(full_messages)
+        except Exception:
+            response = None
+
+    if response is None:
+        # Plain invocation with full fallback chain
+        response = await full_llm.ainvoke(full_messages)
 
     return {"messages": [response]}
 
