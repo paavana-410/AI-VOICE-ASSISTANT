@@ -3,7 +3,7 @@ agents/graph_agent.py — LangGraph powered agentic engine for TESS.
 
 Replaces standard loops with a compiled LangGraph StateGraph:
   1. StateGraph with messages, user_id, doc_context state
-  2. Dynamic tool binding per request
+  2. Dynamic native async tool binding per request
   3. Conditional edges for automated tool execution & loop termination
   4. Multi-provider fallbacks via get_llm()
 """
@@ -47,7 +47,7 @@ class AgentState(TypedDict):
     doc_context: str
 
 
-def call_model_node(state: AgentState):
+async def call_model_node(state: AgentState):
     user_id = state.get("user_id", "demo_user")
     doc_context = state.get("doc_context", "No relevant business documents found.")
     messages = list(state["messages"])
@@ -82,15 +82,15 @@ def call_model_node(state: AgentState):
 
     try:
         llm_with_tools = llm.bind_tools(tools)
-        response = llm_with_tools.invoke(full_messages)
+        response = await llm_with_tools.ainvoke(full_messages)
     except Exception:
         # Fallback to plain invoke without tool binding if provider fails binding
-        response = llm.invoke(full_messages)
+        response = await llm.ainvoke(full_messages)
 
     return {"messages": [response]}
 
 
-def execute_tools_node(state: AgentState):
+async def execute_tools_node(state: AgentState):
     user_id = state.get("user_id", "demo_user")
     messages = state["messages"]
     last_message = messages[-1]
@@ -107,7 +107,7 @@ def execute_tools_node(state: AgentState):
         call_id = tc.get("id", name)
         try:
             if name in tool_map:
-                res = tool_map[name].invoke(args)
+                res = await tool_map[name].ainvoke(args)
             else:
                 res = f"Unknown tool: {name}"
         except Exception as e:
@@ -137,12 +137,12 @@ builder.add_edge("tools", "agent")
 langgraph_app = builder.compile()
 
 
-def run_langgraph_chat(
+async def run_langgraph_chat(
     user_message: str,
     user_id: str,
     doc_context: str = "No relevant business documents found.",
 ) -> str:
-    """Synchronous / Async entry point for LangGraph execution."""
+    """Native async entry point for LangGraph execution."""
     initial_state: AgentState = {
         "messages": [HumanMessage(content=user_message)],
         "user_id": user_id,
@@ -150,7 +150,7 @@ def run_langgraph_chat(
     }
 
     try:
-        final_state = langgraph_app.invoke(initial_state)
+        final_state = await langgraph_app.ainvoke(initial_state)
         messages = final_state.get("messages", [])
         for m in reversed(messages):
             if isinstance(m, AIMessage) and m.content:

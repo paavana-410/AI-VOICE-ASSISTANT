@@ -141,7 +141,7 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
         enriched_message = "\n\n".join(context_parts)
 
         # ── 6. LLM call — LangGraph stateful agent ────────────────────────────
-        reply = run_langgraph_chat(
+        reply = await run_langgraph_chat(
             user_message=enriched_message,
             user_id=user_id,
             doc_context=doc_context,
