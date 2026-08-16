@@ -631,7 +631,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && canSend && !isLoading) { e.preventDefault(); handleSend(); } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder={
               isListening ? '🎙️  Listening...' :
               stagedFiles.length > 0 ? 'Add a message or just hit send…' :
