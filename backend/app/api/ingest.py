@@ -211,7 +211,7 @@ async def _parse_image(data: bytes, filename: str) -> str:
         {"inline_data": {"mime_type": mime, "data": b64}},
         {"text": "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."},
     ]}]}
-    models_to_try = list(dict.fromkeys([GEMINI_MODEL, "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"]))
+    models_to_try = list(dict.fromkeys([GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]))
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             for model in models_to_try:
