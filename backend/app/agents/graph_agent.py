@@ -21,15 +21,11 @@ from app.config import LLM_PROVIDER
 
 def _get_bare_llm():
     """Return a bare (no .with_fallbacks) LLM suitable for bind_tools."""
-    llm = _build_llm_by_name(LLM_PROVIDER)
-    if llm is not None:
-        return llm
-    # Try common fallback providers in order
-    for p in ["groq", "cerebras", "nvidia", "openrouter", "gemini"]:
-        if p != LLM_PROVIDER:
-            llm = _build_llm_by_name(p)
-            if llm is not None:
-                return llm
+    # Try nvidia and gemini first as they have native 100% compliant tool binding support
+    for p in ["nvidia", "gemini", LLM_PROVIDER, "openrouter", "groq"]:
+        llm = _build_llm_by_name(p)
+        if llm is not None:
+            return llm
     return None
 
 SYSTEM_TEMPLATE = """\
