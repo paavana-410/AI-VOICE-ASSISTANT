@@ -163,7 +163,7 @@ def _build_llm_by_name(provider: str):
 def get_llm():
     primary = _build_llm_by_name(LLM_PROVIDER)
     fallbacks = []
-    for p in ["groq", "cerebras", "nvidia", "openrouter"]:
+    for p in ["cerebras", "gemini", "nvidia", "openrouter", "groq"]:
         if p != LLM_PROVIDER:
             fb = _build_llm_by_name(p)
             if fb is not None:
@@ -171,7 +171,7 @@ def get_llm():
     
     if primary and fallbacks:
         return primary.with_fallbacks(fallbacks)
-    return primary or fallbacks[0]
+    return primary or (fallbacks[0] if fallbacks else None)
 
 # ---------------------------------------------------------------------------
 # System prompt

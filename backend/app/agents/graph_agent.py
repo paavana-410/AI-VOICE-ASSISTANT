@@ -98,21 +98,23 @@ async def call_model_node(state: AgentState):
         full_messages = [sys_msg] + messages[1:]
 
     tools = make_tools(user_id)
-    # Use a bare (non-fallback) LLM for bind_tools — with_fallbacks() chains
-    # don't support bind_tools. Plain invocation uses the full fallback chain.
-    bare_llm = _get_bare_llm()
-    full_llm = get_llm()
 
+    # Try providers with tool binding sequentially — if 429 or network error, fallback to next
     response = None
-    if bare_llm is not None:
-        try:
-            llm_with_tools = bare_llm.bind_tools(tools)
-            response = await llm_with_tools.ainvoke(full_messages)
-        except Exception:
-            response = None
+    for provider in ["nvidia", "gemini", "cerebras", "openrouter", "groq"]:
+        bare_llm = _build_llm_by_name(provider)
+        if bare_llm is not None:
+            try:
+                llm_with_tools = bare_llm.bind_tools(tools)
+                response = await llm_with_tools.ainvoke(full_messages)
+                if response:
+                    break
+            except Exception:
+                response = None
 
     if response is None:
         # Plain invocation with full fallback chain
+        full_llm = get_llm()
         response = await full_llm.ainvoke(full_messages)
 
     return {"messages": [response]}
