@@ -52,13 +52,6 @@ def _fmt_doc_chunks(chunks: list) -> str:
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
     try:
-        mcp = None
-        try:
-            from app.mcp.mcp_client import get_mcp_client
-            mcp = get_mcp_client()
-        except Exception:
-            pass
-
         # ── 1. Date / time context ────────────────────────────────────────────
         now = datetime.now()
         date_ctx = now.strftime("%A, %B %d, %Y — %I:%M %p")
