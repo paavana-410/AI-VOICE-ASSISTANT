@@ -201,6 +201,8 @@ async def run_langgraph_chat(
         messages = final_state.get("messages", [])
         for m in reversed(messages):
             if isinstance(m, AIMessage) and m.content:
+                if isinstance(m.content, list):
+                    return "".join(item.get("text", "") if isinstance(item, dict) else str(item) for item in m.content).strip()
                 return str(m.content)
         return "Task processed successfully."
     except Exception as e:

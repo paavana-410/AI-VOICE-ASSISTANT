@@ -201,23 +201,33 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
             except Exception:
                 reply = f"### **Analysis & Document Context**\n\n{doc_context}"
 
+        # Force reply to clean string to guarantee Pydantic serialization
+        if isinstance(reply, list):
+            reply_text = "".join(item.get("text", "") if isinstance(item, dict) else str(item) for item in reply)
+        elif hasattr(reply, "content"):
+            reply_text = str(reply.content)
+        elif not isinstance(reply, str):
+            reply_text = str(reply) if reply is not None else "No response generated."
+        else:
+            reply_text = reply
+
         # ── 7. Persist ────────────────────────────────────────────────────────
         session_id = req.session_id
         try:
             await save_turn(user_id, "user", req.message)
-            await save_turn(user_id, "assistant", reply)
+            await save_turn(user_id, "assistant", reply_text)
 
             session_id = await append_turn_to_session(
                 user_id=user_id,
                 session_id=req.session_id,
                 user_message=req.message,
-                assistant_reply=reply,
+                assistant_reply=reply_text,
             )
         except Exception:
             pass
 
-        return ChatResponse(reply=reply, user_id=user_id, session_id=session_id or "default")
+        return ChatResponse(reply=reply_text, user_id=str(user_id), session_id=str(session_id or "default"))
 
     except Exception as exc:
-        fallback_reply = f"### **Uploaded Document Analysis**\n\n{doc_context}" if 'doc_context' in locals() and doc_context else "I've processed your uploaded image and stored its visual analysis in memory. How can I help you with this document?"
-        return ChatResponse(reply=fallback_reply, user_id=user_id, session_id=req.session_id or "default")
+        fallback_reply = f"### **Uploaded Document Analysis**\n\n{doc_context}" if 'doc_context' in locals() and doc_context else "I've processed your uploaded document/image and stored its analysis in memory. How can I help you with this file?"
+        return ChatResponse(reply=str(fallback_reply), user_id=str(user_id), session_id=str(req.session_id or "default"))
