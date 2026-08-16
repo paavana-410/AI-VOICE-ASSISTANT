@@ -132,12 +132,25 @@ def make_tools(user_id: str) -> list:
         # Path 2: mem0_memories (flat chunks from ingest)
         if db is not None:
             try:
-                words = [w for w in topic.split() if len(w) > 2]
+                words = [w for w in re.split(r'\W+', topic) if len(w) > 2]
                 regex = "|".join(re.escape(w) for w in words[:8]) if words else topic
                 docs = await db["mem0_memories"].find(
                     {"user_id": user_id, "memory": {"$regex": regex, "$options": "i"}},
                     {"_id": 0, "memory": 1, "metadata": 1}
                 ).limit(10).to_list(10)
+                for d in docs:
+                    src = d.get("metadata", {}).get("source", "uploaded file") if isinstance(d.get("metadata"), dict) else "uploaded file"
+                    results.append({"chunk_type": "text", "content": d.get("memory", ""), "source": src})
+            except Exception:
+                pass
+
+        # Path 3 Fallback: If no match for exact topic string, fetch recent uploads from mem0_memories
+        if not results and db is not None:
+            try:
+                docs = await db["mem0_memories"].find(
+                    {"user_id": user_id},
+                    {"_id": 0, "memory": 1, "metadata": 1}
+                ).sort("created_at", -1).limit(5).to_list(5)
                 for d in docs:
                     src = d.get("metadata", {}).get("source", "uploaded file") if isinstance(d.get("metadata"), dict) else "uploaded file"
                     results.append({"chunk_type": "text", "content": d.get("memory", ""), "source": src})
@@ -152,21 +165,21 @@ def make_tools(user_id: str) -> list:
         img_chunks   = [c for c in results if c.get("chunk_type") == "image_caption"
                         and "unavailable" not in c.get("content", "")]
 
-        parts = [f"**Document Summary: {topic}**"]
+        parts = [f"**Document Content & Analysis ({topic}):**"]
         if text_chunks:
-            parts.append("**Key Content:**")
-            for c in text_chunks[:5]:
+            parts.append("**Content Highlights:**")
+            for c in text_chunks[:6]:
                 src = c.get("source", "")
                 prefix = f"[{src}] " if src else ""
-                parts.append(f"• {prefix}{c.get('content','')[:300]}")
+                parts.append(f"• {prefix}{c.get('content','')}")
         if table_chunks:
-            parts.append("**Tables Found:**")
+            parts.append("**Extracted Tables:**")
             for i, c in enumerate(table_chunks, 1):
-                parts.append(f"Table {i} (p{c.get('page_number','?')}):\n{c['content'][:600]}")
+                parts.append(f"Table {i} (p{c.get('page_number','?')}):\n{c['content']}")
         if img_chunks:
-            parts.append("**Figures:**")
+            parts.append("**Extracted Figures & Images:**")
             for c in img_chunks:
-                parts.append(f"• {c['content'][:200]}")
+                parts.append(f"• {c['content']}")
         return "\n\n".join(parts)
 
     return [create_task, update_task_status, get_tasks, search_documents, summarise_document]
