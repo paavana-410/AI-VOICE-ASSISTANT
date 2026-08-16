@@ -336,11 +336,12 @@ def parse_pdf(file_path: str | Path) -> list[dict[str, Any]]:
     if LLAMA_CLOUD_API_KEY:
         try:
             text_elements  = _parse_with_llamaparse(file_path)
-            image_elements = _extract_images_fitz(file_path)
-            all_elements   = text_elements + image_elements
-            # Sort: page first, then y0
-            all_elements.sort(key=lambda e: (e["page_number"], e["bbox"][1]))
-            return all_elements
+            if text_elements:
+                image_elements = _extract_images_fitz(file_path)
+                all_elements   = text_elements + image_elements
+                # Sort: page first, then y0
+                all_elements.sort(key=lambda e: (e["page_number"], e["bbox"][1]))
+                return all_elements
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning(

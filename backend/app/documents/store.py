@@ -59,9 +59,9 @@ async def ensure_vector_index() -> None:
 
 async def store_chunk(chunk: dict) -> None:
     col = _col()
-    loop = asyncio.get_event_loop()
     # Store embedding for future vector search (when index available)
     try:
+        loop = asyncio.get_running_loop()
         embedding = await loop.run_in_executor(None, _embed, chunk["content"])
     except Exception:
         embedding = []
