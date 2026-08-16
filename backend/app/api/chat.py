@@ -94,9 +94,10 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
         try:
             from app.documents.store import search_chunks
             chunks = await search_chunks(req.message, top_k=5)
-            doc_context = _fmt_doc_chunks(chunks)
+            if chunks:
+                doc_context = _fmt_doc_chunks(chunks)
         except Exception:
-            pass   # degrade gracefully if doc store unavailable
+            pass
 
         # ── 5. Assemble enriched message ──────────────────────────────────────
         context_parts = [f"[Current date & time: {date_ctx}]"]
