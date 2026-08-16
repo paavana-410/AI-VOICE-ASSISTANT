@@ -90,16 +90,15 @@ def get_memory_client() -> Optional[Memory]:
 # LangChain LLM client — singleton
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
-def get_llm():
-    if LLM_PROVIDER == "cerebras":
+def _build_llm_by_name(provider: str):
+    if provider == "cerebras" and CEREBRAS_API_KEY:
         from langchain_cerebras import ChatCerebras
         return ChatCerebras(
             api_key=CEREBRAS_API_KEY,
             model=CEREBRAS_MODEL,
             temperature=0.7,
         )
-    elif LLM_PROVIDER == "openrouter":
+    elif provider == "openrouter" and OPENROUTER_API_KEY:
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(
             api_key=OPENROUTER_API_KEY,
@@ -111,20 +110,35 @@ def get_llm():
                 "X-Title": "MemAI Business Assistant",
             },
         )
-    elif LLM_PROVIDER == "gemini":
+    elif provider == "gemini" and GEMINI_API_KEY:
         from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             google_api_key=GEMINI_API_KEY,
             model=GEMINI_MODEL,
             temperature=0.7,
         )
-    else:  # groq (default)
+    elif GROQ_API_KEY:
         from langchain_groq import ChatGroq
         return ChatGroq(
             api_key=GROQ_API_KEY,
             model_name=GROQ_MODEL,
             temperature=0.7,
         )
+    return None
+
+@lru_cache(maxsize=1)
+def get_llm():
+    primary = _build_llm_by_name(LLM_PROVIDER)
+    fallbacks = []
+    for p in ["groq", "cerebras", "openrouter"]:
+        if p != LLM_PROVIDER:
+            fb = _build_llm_by_name(p)
+            if fb is not None:
+                fallbacks.append(fb)
+    
+    if primary and fallbacks:
+        return primary.with_fallbacks(fallbacks)
+    return primary or fallbacks[0]
 
 # ---------------------------------------------------------------------------
 # System prompt
