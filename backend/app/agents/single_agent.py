@@ -90,8 +90,41 @@ def get_memory_client() -> Optional[Memory]:
 # LangChain LLM client — singleton
 # ---------------------------------------------------------------------------
 
+from app.config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GROQ_API_KEY,
+    GROQ_MODEL,
+    LLM_PROVIDER,
+    MONGODB_ATLAS_URI,
+    MONGODB_DB_NAME,
+    MEMORY_COLLECTION,
+    CEREBRAS_API_KEY,
+    CEREBRAS_MODEL,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
+    NVIDIA_API_KEY,
+    NVIDIA_MODEL,
+)
+
 def _build_llm_by_name(provider: str):
-    if provider == "cerebras" and CEREBRAS_API_KEY:
+    if provider == "nvidia" and NVIDIA_API_KEY:
+        try:
+            from langchain_nvidia_ai_endpoints import ChatNVIDIA
+            return ChatNVIDIA(
+                api_key=NVIDIA_API_KEY,
+                model=NVIDIA_MODEL,
+                temperature=0.7,
+            )
+        except Exception:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                api_key=NVIDIA_API_KEY,
+                model=NVIDIA_MODEL,
+                base_url="https://integrate.api.nvidia.com/v1",
+                temperature=0.7,
+            )
+    elif provider == "cerebras" and CEREBRAS_API_KEY:
         from langchain_cerebras import ChatCerebras
         return ChatCerebras(
             api_key=CEREBRAS_API_KEY,
@@ -130,7 +163,7 @@ def _build_llm_by_name(provider: str):
 def get_llm():
     primary = _build_llm_by_name(LLM_PROVIDER)
     fallbacks = []
-    for p in ["groq", "cerebras", "openrouter"]:
+    for p in ["groq", "cerebras", "nvidia", "openrouter"]:
         if p != LLM_PROVIDER:
             fb = _build_llm_by_name(p)
             if fb is not None:

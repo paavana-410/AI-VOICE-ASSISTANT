@@ -24,6 +24,9 @@ CEREBRAS_MODEL: str = os.getenv("CEREBRAS_MODEL", "gpt-oss-120b")
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
 
+NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
+
 MONGODB_DB_NAME: str = os.getenv("MONGODB_DB_NAME", "ai_assistant_db")
 MEMORY_COLLECTION: str = os.getenv("MEMORY_COLLECTION", "memories")
 CONVERSATION_COLLECTION: str = os.getenv("CONVERSATION_COLLECTION", "conversation_history")
