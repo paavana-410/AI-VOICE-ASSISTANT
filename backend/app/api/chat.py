@@ -90,12 +90,44 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
             pass
 
         # ── 4. Document chunk retrieval (async — done HERE) ───────────────────
+        # Searches BOTH collections so all file types are findable:
+        #   • document_chunks  — PDFs via LlamaParse (uploadDocument pipeline)
+        #   • mem0_memories    — DOCX/XLSX/TXT/images via /api/ingest pipeline
         doc_context = "No relevant business documents found."
         try:
+            import re as _re
+            _all_chunks: list = []
+
+            # Path 1: document_chunks (LlamaParse / structured PDF)
             from app.documents.store import search_chunks
-            chunks = await search_chunks(req.message, top_k=5)
-            if chunks:
-                doc_context = _fmt_doc_chunks(chunks)
+            _pdf_chunks = await search_chunks(req.message, top_k=5)
+            _all_chunks.extend(_pdf_chunks)
+
+            # Path 2: mem0_memories (flat ingest — DOCX, XLSX, TXT, images)
+            _db = get_db()
+            if _db is not None:
+                _words = [w for w in _re.split(r'\W+', req.message) if len(w) > 2]
+                if _words:
+                    _pattern = "|".join(_re.escape(w) for w in _words[:8])
+                    _mem_docs = await _db["mem0_memories"].find(
+                        {"user_id": user_id, "memory": {"$regex": _pattern, "$options": "i"}},
+                        {"_id": 0, "memory": 1, "metadata": 1}
+                    ).limit(5).to_list(5)
+                    for _d in _mem_docs:
+                        _src = (
+                            _d.get("metadata", {}).get("source", "uploaded file")
+                            if isinstance(_d.get("metadata"), dict)
+                            else "uploaded file"
+                        )
+                        _all_chunks.append({
+                            "chunk_type":      "text",
+                            "page_number":     "-",
+                            "section_heading": _src,
+                            "content":         _d.get("memory", ""),
+                        })
+
+            if _all_chunks:
+                doc_context = _fmt_doc_chunks(_all_chunks)
         except Exception:
             pass
 

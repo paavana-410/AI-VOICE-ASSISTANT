@@ -3,7 +3,7 @@ import { useAuth } from '../src/authContext';
 import { sendChatMessage, generateImage, ingestFile, uploadDocument } from '../src/api';
 
 type MessageRole = 'user' | 'assistant' | 'system';
-interface Message { id: number; role: MessageRole; content: string; imageUrl?: string; }
+interface Message { id: number; role: MessageRole; content: string; imageUrl?: string; files?: { name: string; size: number }[]; }
 
 // Staged file — picked but not yet uploaded
 interface StagedFile { file: File; id: number; }
@@ -85,6 +85,8 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   const [selectedVoice, setVoice]       = useState<SpeechSynthesisVoice | null>(null);
   const [showAttach, setShowAttach]     = useState(false);
   const [sessionId, setSessionId]       = useState<string | null>(null);
+  // Phase 4 — text-selection popup
+  const [selectionPopup, setSelectionPopup] = useState<{ x: number; y: number; text: string } | null>(null);
 
   const scrollRef   = useRef<HTMLDivElement>(null);
   const recogRef    = useRef<any>(null);
@@ -117,6 +119,43 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  // ── Phase 4: text-selection popup ────────────────────────────────────────
+  useEffect(() => {
+    const handleMouseUp = (e: MouseEvent) => {
+      // Only trigger inside the messages scroll container
+      if (!scrollRef.current?.contains(e.target as Node)) return;
+      setTimeout(() => {
+        const sel = window.getSelection();
+        const selected = sel?.toString().trim() ?? '';
+        if (selected.length > 10 && sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          const rect  = range.getBoundingClientRect();
+          const containerRect = scrollRef.current!.getBoundingClientRect();
+          setSelectionPopup({
+            x: rect.left - containerRect.left + rect.width / 2,
+            y: rect.top  - containerRect.top  - 44,   // 44px above selection
+            text: selected.slice(0, 300),
+          });
+        } else {
+          setSelectionPopup(null);
+        }
+      }, 10);
+    };
+    const handleMouseDown = (e: MouseEvent) => {
+      // Dismiss popup unless clicking the popup button itself
+      const popup = document.getElementById('ask-about-popup');
+      if (popup && popup.contains(e.target as Node)) return;
+      setSelectionPopup(null);
+    };
+    document.addEventListener('mouseup',   handleMouseUp);
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      document.removeEventListener('mouseup',   handleMouseUp);
+      document.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, []);
+
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const addMsg = useCallback((role: MessageRole, content: string, imageUrl?: string) => {
@@ -167,7 +206,11 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
       // ── Upload staged files first ────────────────────────────────────────
       for (const sf of stagedFiles) {
         const uid = (() => { msgId++; return msgId; })();
-        setMessages(p => [...p, { id: uid, role: 'user', content: `📎 ${sf.file.name}` }]);
+        // Add the user message with a files chip that persists in history
+        setMessages(p => [...p, {
+          id: uid, role: 'user', content: '',
+          files: [{ name: sf.file.name, size: sf.file.size }],
+        }]);
 
         const uploadingId = (() => { msgId++; return msgId; })();
         const isPdf = sf.file.name.toLowerCase().endsWith('.pdf');
@@ -304,8 +347,56 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         )}
       </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Messages — position:relative anchors the floating selection popup */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
+
+        {/* ── Phase 4: floating "Ask about this" popup ── */}
+        {selectionPopup && (
+          <div
+            id="ask-about-popup"
+            style={{
+              position: 'absolute',
+              left:  selectionPopup.x,
+              top:   selectionPopup.y,
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              animation: 'fadeUp 0.15s var(--ease)',
+            }}
+          >
+            <button
+              onMouseDown={e => e.preventDefault()} // prevent blur from dismissing
+              onClick={() => {
+                setInput(`Regarding this: "${selectionPopup.text}"\n\n`);
+                setSelectionPopup(null);
+                window.getSelection()?.removeAllRanges();
+                // Focus the text input
+                const inp = document.querySelector<HTMLInputElement>('input[placeholder*="TESS"], input[placeholder*="message"], input[placeholder*="Message"]');
+                inp?.focus();
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                padding: '0.35rem 0.85rem',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                border: 'none',
+                borderRadius: '999px',
+                color: '#fff',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-body)',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.08)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.02em',
+                transition: 'transform 0.1s, box-shadow 0.1s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.6), 0 0 0 1px rgba(255,255,255,0.12)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.45), 0 0 0 1px rgba(255,255,255,0.08)'; }}
+            >
+              💬 Ask about this
+            </button>
+          </div>
+        )}
+
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '4rem', animation: 'fadeUp 0.5s var(--ease)' }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(34,211,238,0.1) 100%)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.25rem', boxShadow: '0 8px 32px rgba(99,102,241,0.15)' }}>🧠</div>
@@ -342,7 +433,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                   </div>
                 )}
                 <div style={{
-                  padding: '0.85rem 1.1rem',
+                  padding: m.files?.length ? '0.6rem 1.1rem 0.85rem' : '0.85rem 1.1rem',
                   background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' : 'rgba(255,255,255,0.04)',
                   border: m.role === 'user' ? 'none' : '1px solid var(--border)',
                   borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
@@ -350,6 +441,25 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                   boxShadow: m.role === 'user' ? '0 4px 16px rgba(99,102,241,0.3)' : 'var(--shadow-sm)',
                   fontSize: '0.88rem', color: m.role === 'user' ? '#fff' : 'var(--text-primary)',
                 }}>
+                  {/* Persistent file chips inside the message bubble */}
+                  {m.files && m.files.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: m.content ? '0.55rem' : 0 }}>
+                      {m.files.map((f, fi) => (
+                        <div key={fi} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                          padding: '0.25rem 0.6rem',
+                          background: 'rgba(255,255,255,0.15)',
+                          border: '1px solid rgba(255,255,255,0.25)',
+                          borderRadius: '999px',
+                          fontSize: '0.76rem', color: '#fff',
+                        }}>
+                          <span>{fileIcon(f.name)}</span>
+                          <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                          <span style={{ opacity: 0.65, fontSize: '0.65rem', flexShrink: 0 }}>{formatBytes(f.size)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <MessageContent content={m.content} />
                   {m.imageUrl && (
                     <div style={{ marginTop: '0.75rem' }}>
