@@ -125,33 +125,37 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
                         "content":         _d.get("memory", ""),
                     })
 
-                # Keyword & pattern search across memory text & metadata.source
-                _words = [w for w in _re.split(r'\W+', req.message) if len(w) > 2]
+                # Keyword & pattern search — cap at 4 short words to avoid MongoDB maxClauseCount=1024
+                _raw_words = [w for w in _re.split(r'\W+', req.message) if 3 <= len(w) <= 20]
+                _words = _raw_words[:4]  # Hard cap: 4 terms max to stay under MongoDB FTS clause limit
                 if _words:
-                    _pattern = "|".join(_re.escape(w) for w in _words[:8])
-                    _mem_docs = await _db["mem0_memories"].find(
-                        {
-                            "user_id": user_id,
-                            "$or": [
-                                {"memory": {"$regex": _pattern, "$options": "i"}},
-                                {"metadata.source": {"$regex": _pattern, "$options": "i"}}
-                            ]
-                        },
-                        {"_id": 0, "memory": 1, "metadata": 1}
-                    ).limit(5).to_list(5)
-                    for _d in _mem_docs:
-                        _src = (
-                            _d.get("metadata", {}).get("source", "uploaded file")
-                            if isinstance(_d.get("metadata"), dict)
-                            else "uploaded file"
-                        )
-                        if not any(c.get("content") == _d.get("memory") for c in _all_chunks):
-                            _all_chunks.append({
-                                "chunk_type":      "text",
-                                "page_number":     "-",
-                                "section_heading": _src,
-                                "content":         _d.get("memory", ""),
-                            })
+                    _pattern = "|".join(_re.escape(w) for w in _words)
+                    try:
+                        _mem_docs = await _db["mem0_memories"].find(
+                            {
+                                "user_id": user_id,
+                                "$or": [
+                                    {"memory": {"$regex": _pattern, "$options": "i"}},
+                                    {"metadata.source": {"$regex": _pattern, "$options": "i"}}
+                                ]
+                            },
+                            {"_id": 0, "memory": 1, "metadata": 1}
+                        ).limit(5).to_list(5)
+                        for _d in _mem_docs:
+                            _src = (
+                                _d.get("metadata", {}).get("source", "uploaded file")
+                                if isinstance(_d.get("metadata"), dict)
+                                else "uploaded file"
+                            )
+                            if not any(c.get("content") == _d.get("memory") for c in _all_chunks):
+                                _all_chunks.append({
+                                    "chunk_type":      "text",
+                                    "page_number":     "-",
+                                    "section_heading": _src,
+                                    "content":         _d.get("memory", ""),
+                                })
+                    except Exception:
+                        pass  # MongoDB maxClauseCount or other query error — skip keyword search
 
             # Path 3 Fallback: If no chunks matched query words, fetch most recent user memories/uploads
             if not _all_chunks and _db is not None:
