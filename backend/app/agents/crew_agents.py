@@ -46,9 +46,12 @@ def _make_memory_tools(user_id: str):
     @tool("memory_search")
     def memory_search(query: str) -> str:
         """Search the shared persistent memory store for relevant facts."""
-        mem = get_memory_client()
-        result = mem.search(query=query, filters={"user_id": user_id}, limit=5)
-        memories = result.get("results", result) if isinstance(result, dict) else result
+        clean_q = str(query).strip()[:100]
+        try:
+            result = mem.search(query=clean_q, filters={"user_id": user_id}, limit=5)
+            memories = result.get("results", result) if isinstance(result, dict) else result
+        except Exception:
+            memories = []
         return json.dumps(memories, default=str)
 
     @tool("memory_add")

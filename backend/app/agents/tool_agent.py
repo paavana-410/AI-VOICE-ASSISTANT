@@ -67,10 +67,11 @@ def chat_with_tools(
     raw_memories = []
     mem = get_memory_client()
     try:
+        clean_query = user_message.strip().split("\n\n")[-1].strip()[:100]
         if mcp_client is not None:
-            raw_memories = mcp_client.search(user_message, user_id=user_id)
-        elif mem is not None:
-            result = mem.search(query=user_message, filters={"user_id": user_id}, limit=5)
+            raw_memories = mcp_client.search(clean_query, user_id=user_id)
+        elif mem is not None and clean_query:
+            result = mem.search(query=clean_query, filters={"user_id": user_id}, limit=5)
             raw_memories = result.get("results", result) if isinstance(result, dict) else result
     except Exception:
         raw_memories = []

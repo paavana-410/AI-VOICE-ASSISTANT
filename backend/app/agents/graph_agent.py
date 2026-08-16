@@ -80,11 +80,13 @@ async def call_model_node(state: AgentState):
             user_text = ""
             for m in reversed(messages):
                 if isinstance(m, HumanMessage):
-                    user_text = m.content
+                    user_text = str(m.content)
                     break
             if user_text:
-                res = mem.search(query=user_text, filters={"user_id": user_id}, limit=5)
-                raw_memories = res.get("results", res) if isinstance(res, dict) else res
+                clean_query = user_text.strip().split("\n\n")[-1].strip()[:100]
+                if clean_query:
+                    res = mem.search(query=clean_query, filters={"user_id": user_id}, limit=5)
+                    raw_memories = res.get("results", res) if isinstance(res, dict) else res
     except Exception:
         raw_memories = []
     

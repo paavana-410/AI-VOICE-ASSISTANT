@@ -235,13 +235,14 @@ def chat_with_memory(
     # -- Step 1: retrieve conversational memories (best-effort) ---------------
     raw_memories = []
     try:
+        clean_query = user_message.strip().split("\n\n")[-1].strip()[:100]
         if mcp_client is not None:
-            raw_memories = mcp_client.search(user_message, user_id=user_id)
+            raw_memories = mcp_client.search(clean_query, user_id=user_id)
         else:
             mem = get_memory_client()
-            if mem is not None:
+            if mem is not None and clean_query:
                 result = mem.search(
-                    query=user_message,
+                    query=clean_query,
                     filters={"user_id": user_id},
                     limit=5,
                 )
