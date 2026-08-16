@@ -107,44 +107,60 @@ async def search_chunks(
 
     raw: list[dict] = []
 
-    # ── Step 1: keyword search in content ────────────────────────────────────
-    words = [w for w in re.split(r'\W+', query) if len(w) > 2]
-    if words:
-        pattern = "|".join(re.escape(w) for w in words[:8])
-        q = {**base_filter, "content": {"$regex": pattern, "$options": "i"}}
-        raw = await col.find(q, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+    try:
+        # ── Step 1: keyword search in content ────────────────────────────────────
+        raw_words = [w for w in re.split(r'\W+', query) if 3 <= len(w) <= 20]
+        words = raw_words[:4]
+        if words:
+            pattern = "|".join(re.escape(w) for w in words)
+            q = {**base_filter, "content": {"$regex": pattern, "$options": "i"}}
+            try:
+                raw = await col.find(q, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+            except Exception:
+                raw = []
 
-    # ── Step 2: filename match ────────────────────────────────────────────────
-    if not raw and words:
-        pattern = "|".join(re.escape(w) for w in words[:4])
-        q = {**base_filter, "filename": {"$regex": pattern, "$options": "i"}}
-        raw = await col.find(q, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+        # ── Step 2: filename match ────────────────────────────────────────────────
+        if not raw and words:
+            pattern = "|".join(re.escape(w) for w in words[:3])
+            q = {**base_filter, "filename": {"$regex": pattern, "$options": "i"}}
+            try:
+                raw = await col.find(q, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+            except Exception:
+                raw = []
 
-    # ── Step 3: return most recent chunks ─────────────────────────────────────
-    if not raw:
-        raw = await col.find(base_filter, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+        # ── Step 3: return most recent chunks ─────────────────────────────────────
+        if not raw:
+            try:
+                raw = await col.find(base_filter, {"embedding": 0, "_id": 0}).sort("_id", -1).limit(top_k).to_list(top_k)
+            except Exception:
+                raw = []
 
-    if not raw:
+        if not raw:
+            return []
+
+        # ── Context stitching ─────────────────────────────────────────────────────
+        seen: set[str] = set()
+        result: list[dict] = []
+        for chunk in raw:
+            cid = chunk.get("chunk_id", "")
+            if cid in seen:
+                continue
+            seen.add(cid)
+            if chunk.get("chunk_type") in ("table", "image_caption"):
+                pid = chunk.get("parent_id")
+                if pid and pid not in seen:
+                    try:
+                        parent = await col.find_one({"chunk_id": pid}, {"embedding": 0, "_id": 0})
+                        if parent:
+                            seen.add(pid)
+                            result.append(parent)
+                    except Exception:
+                        pass
+            result.append(chunk)
+
+        return result
+    except Exception:
         return []
-
-    # ── Context stitching ─────────────────────────────────────────────────────
-    seen: set[str] = set()
-    result: list[dict] = []
-    for chunk in raw:
-        cid = chunk.get("chunk_id", "")
-        if cid in seen:
-            continue
-        seen.add(cid)
-        if chunk.get("chunk_type") in ("table", "image_caption"):
-            pid = chunk.get("parent_id")
-            if pid and pid not in seen:
-                parent = await col.find_one({"chunk_id": pid}, {"embedding": 0, "_id": 0})
-                if parent:
-                    seen.add(pid)
-                    result.append(parent)
-        result.append(chunk)
-
-    return result
 
 
 # ── List / delete ─────────────────────────────────────────────────────────────

@@ -39,7 +39,7 @@ async def save_turn(user_id: str, role: str, content: str) -> None:
         "user_id": user_id,
         "role": role,          # "user" | "assistant"
         "content": content,
-        "timestamp": datetime.datetime.utcnow(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc),
     }
     await col.insert_one(doc)
 
