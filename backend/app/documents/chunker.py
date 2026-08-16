@@ -67,17 +67,14 @@ def _caption_image(png_bytes: bytes, page: int) -> str:
                 ]
             }]
         }
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-        )
-        # Single attempt, no retries — fail fast so it doesn't block the pipeline
-        resp = httpx.post(url, json=payload, timeout=15)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        # Non-200: return placeholder and continue — do not raise
-        return f"[Image on page {page} — vision unavailable (HTTP {resp.status_code})]"
+        models = [GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+        for m in list(dict.fromkeys(models)):
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_API_KEY}"
+            resp = httpx.post(url, json=payload, timeout=15)
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return f"[Image on page {page} — vision unavailable]"
     except Exception as exc:
         return f"[Image on page {page} — caption skipped: {type(exc).__name__}]"
 
