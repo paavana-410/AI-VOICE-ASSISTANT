@@ -99,6 +99,7 @@ export default function FileUpload() {
   const { accessToken } = useAuth();
   const [storedDocs, setStoredDocs]   = useState<StoredDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [clearedImages, setClearedImages] = useState(false);
   const [uploads, setUploads]         = useState<UploadEntry[]>([]);
   const [isDragging, setDragging]     = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,13 +181,26 @@ export default function FileUpload() {
                   if (!accessToken) return;
                   try {
                     await clearImageMemories(accessToken);
+                    setClearedImages(true);
+                    setTimeout(() => setClearedImages(false), 2500);
                     await loadDocs();
                   } catch (e) {}
                 }}
-                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--r-sm)', padding: '2px 8px', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', fontWeight: '500' }}
+                style={{
+                  background: clearedImages ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.1)',
+                  border: clearedImages ? '1px solid rgba(34,197,94,0.45)' : '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 'var(--r-sm)',
+                  padding: '2px 8px',
+                  cursor: 'pointer',
+                  color: clearedImages ? '#22c55e' : 'var(--danger)',
+                  fontSize: '0.72rem',
+                  fontFamily: 'var(--font-body)',
+                  fontWeight: '600',
+                  transition: 'all 0.2s ease',
+                }}
                 title="Clear all stored image memories"
               >
-                🗑️ Clear Images
+                {clearedImages ? '✅ Cleared!' : '🗑️ Clear Images'}
               </button>
               <button
                 onClick={loadDocs}

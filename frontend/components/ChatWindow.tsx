@@ -279,8 +279,6 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           const queryPayload = fileContext.length > 0
             ? `${fileContext.join(' ')} ${text}`
             : text;
-          // Clear last uploaded context after using it
-          if (lastUploadedFiles.length > 0) setLastUploadedFiles([]);
           const r = await sendChatMessage(accessToken, queryPayload, isCrew, sessionId);
           abortRef.current = null;
           addMsg('assistant', r.reply);
