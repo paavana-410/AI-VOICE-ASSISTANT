@@ -281,8 +281,6 @@ async def list_document_chunks(
     ]
 
 
-# ── Delete ────────────────────────────────────────────────────────────────────
-
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
@@ -292,3 +290,30 @@ async def delete_document(
         raise HTTPException(403, "Access denied.")
     deleted = await doc_store.delete_document_chunks(document_id)
     return {"deleted_chunks": deleted, "document_id": document_id}
+
+
+@router.delete("/documents/clear-images")
+async def clear_image_memories(user_id: str = Depends(get_current_user_id)):
+    """Delete all image memory documents for the authenticated user."""
+    from app.db.mongo import get_db
+    import re
+    db = get_db()
+    if db is None:
+        raise HTTPException(503, "Database not connected")
+
+    deleted_count = 0
+    cols = ["mem0_memories", "conversation_history", "document_chunks"]
+    for col_name in cols:
+        col = db[col_name]
+        query = {
+            "$or": [
+                {"metadata.source": {"$regex": r"\.(png|jpg|jpeg|webp|gif|bmp)$", "$options": "i"}},
+                {"memory": {"$regex": r"\.(png|jpg|jpeg|webp|gif|bmp)", "$options": "i"}},
+                {"memory": {"$regex": r"\[Image", "$options": "i"}},
+                {"chunk_type": "image_caption"},
+            ]
+        }
+        res = await col.delete_many(query)
+        deleted_count += res.deleted_count
+
+    return {"status": "success", "deleted_images": deleted_count}

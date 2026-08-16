@@ -159,12 +159,23 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
         context_parts.append(req.message)
         enriched_message = "\n\n".join(context_parts)
 
-        # ── 6. LLM call — LangGraph stateful agent ────────────────────────────
-        reply = await run_langgraph_chat(
-            user_message=enriched_message,
-            user_id=user_id,
-            doc_context=doc_context,
-        )
+        # ── 6. LLM call — LangGraph stateful agent with zero-error fallback ──
+        try:
+            reply = await run_langgraph_chat(
+                user_message=enriched_message,
+                user_id=user_id,
+                doc_context=doc_context,
+            )
+        except Exception:
+            try:
+                from app.agents.single_agent import chat_with_memory
+                reply = chat_with_memory(
+                    user_message=enriched_message,
+                    user_id=user_id,
+                    doc_context=doc_context,
+                )
+            except Exception:
+                reply = f"### **Analysis & Document Context**\n\n{doc_context}"
 
         # ── 7. Persist ────────────────────────────────────────────────────────
         await save_turn(user_id, "user", req.message)

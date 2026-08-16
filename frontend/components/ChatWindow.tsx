@@ -676,21 +676,38 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
             }}
           />
 
-          {/* Send — active when text OR file is ready */}
-          <button
-            type="button"
-            onClick={() => handleSend()}
-            disabled={!canSend}
-            style={{
-              width: '34px', height: '34px', borderRadius: '10px', border: 'none',
-              background: canSend ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(99,102,241,0.1)',
-              color: canSend ? 'white' : 'var(--text-muted)',
-              cursor: canSend ? 'pointer' : 'not-allowed',
-              fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all var(--dur-fast)', flexShrink: 0,
-              boxShadow: canSend ? '0 2px 8px rgba(99,102,241,0.35)' : 'none',
-            }}
-          >↑</button>
+          {/* Send / Stop button on the right side of textbox */}
+          {isLoading ? (
+            <button
+              type="button"
+              onClick={stopGeneration}
+              title="Stop response"
+              style={{
+                width: '34px', height: '34px', borderRadius: '10px', border: '1px solid rgba(239,68,68,0.4)',
+                background: 'rgba(239,68,68,0.2)',
+                color: '#ef4444',
+                cursor: 'pointer',
+                fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all var(--dur-fast)', flexShrink: 0,
+                boxShadow: '0 0 12px rgba(239,68,68,0.4)',
+              }}
+            >⏹</button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleSend()}
+              disabled={!canSend}
+              style={{
+                width: '34px', height: '34px', borderRadius: '10px', border: 'none',
+                background: canSend ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(99,102,241,0.1)',
+                color: canSend ? 'white' : 'var(--text-muted)',
+                cursor: canSend ? 'pointer' : 'not-allowed',
+                fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all var(--dur-fast)', flexShrink: 0,
+                boxShadow: canSend ? '0 2px 8px rgba(99,102,241,0.35)' : 'none',
+              }}
+            >↑</button>
+          )}
         </div>
       </div>
     </div>

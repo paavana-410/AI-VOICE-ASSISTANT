@@ -346,6 +346,15 @@ export async function deleteDocument(token: string, documentId: string): Promise
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
 }
 
+export async function clearImageMemories(token: string): Promise<{ deleted_images: number }> {
+  const res = await fetch('/api/documents/clear-images', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Clear images failed: ${res.status}`);
+  return res.json();
+}
+
 // ── Document Analysis (Phase 2.2) ─────────────────────────────────────────────
 
 export interface TableCard { caption: string; markdown: string; page: number; }

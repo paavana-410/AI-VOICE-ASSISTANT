@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth } from '../src/authContext';
-import { ingestFile, uploadDocument, deleteDocument, listDocuments, StoredDocument, IngestResult, DocumentUploadResult } from '../src/api';
+import { ingestFile, uploadDocument, deleteDocument, clearImageMemories, listDocuments, StoredDocument, IngestResult, DocumentUploadResult } from '../src/api';
 
 const ACCEPTED = '.pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.gif,.mp3,.wav,.m4a,.mp4,.mov';
 
@@ -174,14 +174,29 @@ export default function FileUpload() {
             <span style={{ fontSize: '0.82rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
               🗂 Stored Documents {storedDocs.length > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({storedDocs.length})</span>}
             </span>
-            <button
-              onClick={loadDocs}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-light)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              <span className={docsLoading ? 'pulsing' : ''}>⟳</span> Refresh
-            </button>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <button
+                onClick={async () => {
+                  if (!accessToken) return;
+                  try {
+                    await clearImageMemories(accessToken);
+                    await loadDocs();
+                  } catch (e) {}
+                }}
+                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--r-sm)', padding: '2px 8px', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.72rem', fontFamily: 'var(--font-body)', fontWeight: '500' }}
+                title="Clear all stored image memories"
+              >
+                🗑️ Clear Images
+              </button>
+              <button
+                onClick={loadDocs}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.78rem', fontFamily: 'var(--font-body)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-light)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+              >
+                <span className={docsLoading ? 'pulsing' : ''}>⟳</span> Refresh
+              </button>
+            </div>
           </div>
 
           {docsLoading ? (
