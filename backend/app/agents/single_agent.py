@@ -263,8 +263,7 @@ def chat_with_memory(
     ))
     human_msg = HumanMessage(content=user_message)
 
-    # -- Step 3: call LLM with per-provider retry on 429 ----------------------
-    PROVIDER_ORDER = [LLM_PROVIDER, "cerebras", "gemini", "nvidia", "openrouter", "groq"]
+    PROVIDER_ORDER = ["cerebras", "gemini", "groq", "openrouter", "nvidia"]
     seen = set()
     assistant_reply: str = ""
     for _p in PROVIDER_ORDER:

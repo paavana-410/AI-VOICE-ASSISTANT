@@ -12,7 +12,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 MONGODB_ATLAS_URI: str = os.getenv("MONGODB_ATLAS_URI", os.getenv("MONGO_URI", ""))
 MONGO_URI: str = MONGODB_ATLAS_URI
 
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "groq")
