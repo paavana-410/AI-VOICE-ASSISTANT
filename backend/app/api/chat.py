@@ -126,6 +126,25 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user_id)):
                             "content":         _d.get("memory", ""),
                         })
 
+            # Path 3 Fallback: If no chunks matched query words, fetch most recent user memories/uploads
+            if not _all_chunks and _db is not None:
+                _recent_mem_docs = await _db["mem0_memories"].find(
+                    {"user_id": user_id},
+                    {"_id": 0, "memory": 1, "metadata": 1}
+                ).sort("created_at", -1).limit(5).to_list(5)
+                for _d in _recent_mem_docs:
+                    _src = (
+                        _d.get("metadata", {}).get("source", "uploaded file")
+                        if isinstance(_d.get("metadata"), dict)
+                        else "uploaded file"
+                    )
+                    _all_chunks.append({
+                        "chunk_type":      "text",
+                        "page_number":     "-",
+                        "section_heading": _src,
+                        "content":         _d.get("memory", ""),
+                    })
+
             if _all_chunks:
                 doc_context = _fmt_doc_chunks(_all_chunks)
         except Exception:
