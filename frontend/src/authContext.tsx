@@ -25,25 +25,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Silent refresh on mount using the httpOnly refresh cookie
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/auth/refresh', {
-          method: 'POST',
-          credentials: 'include', // send the httpOnly cookie
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAccessToken(data.access_token);
-        }
-      } catch (_) {
-        // No valid cookie — user must log in
-      } finally {
-        setLoading(false);
+  const doRefresh = useCallback(async () => {
+    try {
+      const res = await fetch('/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAccessToken(data.access_token);
+        return true;
       }
-    })();
+    } catch (_) {}
+    return false;
   }, []);
+
+  // Silent refresh on mount
+  useEffect(() => {
+    doRefresh().finally(() => setLoading(false));
+  }, [doRefresh]);
+
+  // Auto-refresh every 12 minutes (token expires in 15)
+  useEffect(() => {
+    const interval = setInterval(() => { doRefresh(); }, 12 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [doRefresh]);
 
   const login = useCallback((token: string) => {
     setAccessToken(token);
