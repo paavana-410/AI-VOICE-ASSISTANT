@@ -44,7 +44,7 @@ function DocCard({ doc, onDelete }: { doc: StoredDocument; onDelete: () => void 
   const { accessToken } = useAuth();
 
   const handleDelete = async () => {
-    if (!accessToken || !window.confirm(`Delete "${doc.filename}"?`)) return;
+    if (!accessToken) return;
     setDeleting(true);
     try {
       await deleteDocument(accessToken, doc.document_id);

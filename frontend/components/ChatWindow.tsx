@@ -191,8 +191,9 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   // ── Main send — handles text, files, or both ──────────────────────────────
   const handleSend = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? input).trim();
+    const currentFiles = [...stagedFiles];
     const hasText  = text.length > 0;
-    const hasFiles = stagedFiles.length > 0;
+    const hasFiles = currentFiles.length > 0;
 
     if (!hasText && !hasFiles) return;
     if (!accessToken) return;
@@ -204,7 +205,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
 
     try {
       // ── Upload staged files first ────────────────────────────────────────
-      for (const sf of stagedFiles) {
+      for (const sf of currentFiles) {
         const uid = (() => { msgId++; return msgId; })();
         // Add the user message with a files chip that persists in history
         setMessages(p => [...p, {
@@ -267,7 +268,10 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           // Use AbortController so user can cancel mid-request
           const controller = new AbortController();
           abortRef.current = controller;
-          const r = await sendChatMessage(accessToken, text, isCrew, sessionId);
+          const queryPayload = currentFiles.length > 0
+            ? `${currentFiles.map(sf => sf.file.name).join(' ')} ${text}`
+            : text;
+          const r = await sendChatMessage(accessToken, queryPayload, isCrew, sessionId);
           abortRef.current = null;
           addMsg('assistant', r.reply);
           if (r.session_id) setSessionId(r.session_id);
