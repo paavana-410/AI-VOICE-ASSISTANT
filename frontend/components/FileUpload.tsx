@@ -11,6 +11,9 @@ const EXT_ICON: Record<string, string> = {
   mp3: '🎵', wav: '🎵', m4a: '🎵', mp4: '🎬', mov: '🎬',
 };
 
+// These file types are silently ingested into memory — not shown in Documents panel
+const SILENT_EXTS = new Set(['png','jpg','jpeg','webp','gif','bmp','mp3','wav','m4a','ogg','mp4','mov','avi']);
+
 function getIcon(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';
   return EXT_ICON[ext] ?? '📁';
@@ -116,17 +119,26 @@ export default function FileUpload() {
     if (!accessToken) return;
     const arr = Array.from(files);
     setUploads(prev => [
-      ...arr.map(f => ({ name: f.name, size: f.size, isPdf: f.name.toLowerCase().endsWith('.pdf'), status: 'uploading' as const, progress: 0 })),
+      // Only add non-silent files to the upload progress list
+      ...arr
+        .filter(f => !SILENT_EXTS.has(f.name.split('.').pop()?.toLowerCase() ?? ''))
+        .map(f => ({ name: f.name, size: f.size, isPdf: f.name.toLowerCase().endsWith('.pdf'), status: 'uploading' as const, progress: 0 })),
       ...prev,
     ]);
 
     for (const file of arr) {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const isSilent = SILENT_EXTS.has(ext);
       const isPdf = file.name.toLowerCase().endsWith('.pdf');
       const patch = (p: Partial<UploadEntry>) =>
         setUploads(prev => prev.map(u => u.name === file.name && u.status === 'uploading' ? { ...u, ...p } : u));
 
       try {
-        if (isPdf) {
+        if (isSilent) {
+          // Silently ingest images/audio/video — stored in memory, never shown in Documents
+          await ingestFile(accessToken, file);
+          // No UI update — file is stored but not displayed
+        } else if (isPdf) {
           const r = await uploadDocument(accessToken, file, pct => patch({ progress: pct }));
           patch({ status: 'done', progress: 100, docResult: r });
         } else {
@@ -135,7 +147,7 @@ export default function FileUpload() {
         }
         await loadDocs(); // refresh stored docs list
       } catch (err: any) {
-        patch({ status: 'error', error: err.message ?? 'Upload failed' });
+        if (!isSilent) patch({ status: 'error', error: err.message ?? 'Upload failed' });
       }
     }
   }, [accessToken, loadDocs]);
@@ -221,7 +233,8 @@ export default function FileUpload() {
               {isDragging ? 'Drop to upload' : 'Drag & drop or click to browse'}
             </p>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              PDF · Word · Excel · Images · Audio · Video — Max 50MB
+              PDF · Word · Excel · TXT — shown in Documents list<br />
+              <span style={{ opacity: 0.6 }}>Images / Audio / Video — stored silently in memory</span>
             </p>
             <input ref={fileInputRef} type="file" multiple accept={ACCEPTED}
               onChange={e => { if (e.target.files?.length) processFiles(e.target.files); e.target.value = ''; }}
