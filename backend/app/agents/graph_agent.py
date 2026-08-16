@@ -103,7 +103,7 @@ async def call_model_node(state: AgentState):
 
     # Try providers with tool binding sequentially — catch 429/rate/quota silently
     response = None
-    for provider in ["nvidia", "gemini", "cerebras", "openrouter", "groq"]:
+    for provider in ["cerebras", "gemini", "nvidia", "openrouter", "groq"]:
         bare_llm = _build_llm_by_name(provider)
         if bare_llm is None:
             continue
