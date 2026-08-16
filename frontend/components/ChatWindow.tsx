@@ -234,7 +234,6 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                 ? { ...m, content: `✅ "${r.filename}" fully parsed — ${r.chunks.text} text · ${r.chunks.table} table${r.chunks.table !== 1 ? 's' : ''} · ${r.chunks.image_caption} image${r.chunks.image_caption !== 1 ? 's' : ''} stored` }
                 : m
             ));
-            if (voiceEnabled) speak(`${r.filename} parsed with ${r.chunks.total} chunks saved.`, selectedVoice);
           } else {
             // All other file types — fast local ingest
             const r = await ingestFile(accessToken, sf.file);
@@ -243,7 +242,6 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                 ? { ...m, content: `✅ "${r.filename}" stored — ${r.chunks_stored} chunk(s) saved to memory` }
                 : m
             ));
-            if (voiceEnabled) speak(`${r.filename} saved to memory.`, selectedVoice);
           }
         } catch (err: any) {
           setMessages(p => p.map(m =>
