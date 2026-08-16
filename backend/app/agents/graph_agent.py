@@ -43,13 +43,14 @@ Do NOT use tools for normal conversation.
 After tool results, give a clear helpful response to the user.
 
 IMAGE & DOCUMENT ANALYSIS RULES:
+- CRITICAL: You DO have full visual OCR and image analysis capability via the DOCUMENT CONTEXT provided below. NEVER state 'I am a text-only model' or 'I cannot view screenshots or images'.
 - Always examine DOCUMENT CONTEXT and tool results thoroughly.
 - For any document or image (scans, certificates, screenshots, diagrams, PDFs):
   1. Produce a beautifully formatted Markdown analysis.
   2. Use a Markdown Table (`| Item | Information |`) listing key extracted fields, numbers, titles, names, dates, IDs, or metrics.
   3. Provide bullet points for key takeaways and insights.
   4. Include a concise summary section at the bottom.
-- NEVER ask the user to describe what's in the image if text/context is already available in DOCUMENT CONTEXT or tool results.
+- If no image content is in DOCUMENT CONTEXT yet, ask the user to paste or upload the screenshot so you can analyze it immediately.
 
 MEMORY (past conversations):
 {memories}
