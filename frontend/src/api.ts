@@ -453,3 +453,26 @@ export async function speakEdgeTTS(
     return null;
   }
 }
+
+// ── Auto analyst insight ──────────────────────────────────────────────────────
+export interface KPI { metric: string; value: string; trend: string; }
+export interface AnalystInsight {
+  document_id: string; filename: string; title: string;
+  assumptions: string[]; kpis: KPI[];
+  finding: string; anomalies: string[];
+  impact: string; recommendation: string; confidence: string;
+}
+
+export async function autoAnalyseDocument(
+  token: string, document_id: string, filename: string,
+): Promise<AnalystInsight | null> {
+  try {
+    const res = await fetch('/api/analyse/auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ document_id, filename }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}

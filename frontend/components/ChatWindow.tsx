@@ -255,6 +255,26 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                 ? { ...m, content: `✅ "${r.filename}" fully parsed — ${r.chunks.text} text · ${r.chunks.table} table${r.chunks.table !== 1 ? 's' : ''} · ${r.chunks.image_caption} image${r.chunks.image_caption !== 1 ? 's' : ''} stored` }
                 : m
             ));
+
+            // Auto-generate analyst insight card
+            try {
+              const { autoAnalyseDocument } = await import('../src/api');
+              const insight = await autoAnalyseDocument(accessToken!, r.document_id, r.filename);
+              if (insight) {
+                const insightMd = [
+                  `## 📊 Analyst Insight: ${insight.title}`,
+                  insight.assumptions.length ? `**Assumptions:** ${insight.assumptions.join(' · ')}` : '',
+                  `### 📌 Key Metrics`,
+                  insight.kpis.map(k => `- **${k.metric}:** ${k.value} ${k.trend}`).join('\n'),
+                  `### 🔍 Finding\n${insight.finding}`,
+                  insight.anomalies.length ? `### ⚠️ Anomalies Detected\n${insight.anomalies.map(a => `- ${a}`).join('\n')}` : '',
+                  `### 💡 Impact\n${insight.impact}`,
+                  `### ✅ Recommendation\n${insight.recommendation}`,
+                  `**Confidence:** ${insight.confidence}`,
+                ].filter(Boolean).join('\n\n');
+                addMsg('assistant', insightMd);
+              }
+            } catch { /* insight generation is best-effort */ }
           } else {
             // All other file types — fast local ingest
             const r = await ingestFile(accessToken, sf.file);
@@ -450,14 +470,14 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '4rem', animation: 'fadeUp 0.5s var(--ease)' }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(34,211,238,0.1) 100%)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.25rem', boxShadow: '0 8px 32px rgba(99,102,241,0.15)' }}>🧠</div>
-            <p style={{ fontFamily: 'var(--font-head)', fontSize: '1.05rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>TESS — Business AI Assistant</p>
-            <p style={{ fontSize: '0.78rem', marginBottom: '1.5rem', opacity: 0.6 }}>Chat · Upload Files · Voice · Image Generation</p>
+            <p style={{ fontFamily: 'var(--font-head)', fontSize: '1.05rem', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>TESS — AI Business Analyst</p>
+            <p style={{ fontSize: '0.78rem', marginBottom: '1.5rem', opacity: 0.6 }}>Upload a document · Ask a business question · Get analyst-grade insights</p>
             <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '0.4rem', textAlign: 'left' }}>
               {[
-                '💬  "Summarize my Q3 report"',
-                '🎨  "/image a modern office dashboard"',
-                '📋  "What tasks are pending today?"',
-                '📎  Click + to attach any file — with or without a message',
+                '📊  "Upload a sales report and analyse it"',
+                '🔍  "Why did Department 3 underperform in Q3?"',
+                '📋  "Compare Q1 and Q2 performance"',
+                '💡  "What should we do to improve margins?"',
               ].map((hint, i) => (
                 <div key={i}
                   style={{ padding: '0.45rem 0.85rem', borderRadius: 'var(--r-md)', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer', transition: 'all var(--dur-fast)' }}
@@ -530,6 +550,26 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
                     if (prev) handleSend(prev.content);
                   } : undefined}
                 />
+                {/* Confidence badge — shown when analyst response includes confidence level */}
+                {m.role === 'assistant' && /\*\*Confidence:\*\*|Confidence:/i.test(m.content) && (() => {
+                  const match = m.content.match(/Confidence[:\*\s]+([^\n\r.]+)/i);
+                  const conf = match ? match[1].replace(/\*/g,'').trim() : '';
+                  const isHigh = /high/i.test(conf);
+                  const isMed = /medium/i.test(conf);
+                  return conf ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
+                      <span style={{
+                        fontSize: '0.67rem', padding: '0.15rem 0.5rem', borderRadius: '999px',
+                        background: isHigh ? 'rgba(34,197,94,0.12)' : isMed ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)',
+                        color: isHigh ? '#22c55e' : isMed ? '#f59e0b' : '#ef4444',
+                        border: `1px solid ${isHigh ? 'rgba(34,197,94,0.3)' : isMed ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                        fontWeight: 600, letterSpacing: '0.03em',
+                      }}>
+                        {isHigh ? '● High Confidence' : isMed ? '● Medium Confidence' : '● Low Confidence'}
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             )}
           </div>

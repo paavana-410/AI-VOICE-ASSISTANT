@@ -10,8 +10,8 @@ import { useAuth } from '../src/authContext';
 type Tab = 'chat' | 'upload' | 'memory' | 'analytics';
 
 const TABS: { id: Tab; label: string; icon: string; desc: string }[] = [
-  { id: 'chat',      label: 'Chat',       icon: '💬', desc: 'AI Assistant' },
-  { id: 'upload',    label: 'Documents',  icon: '📂', desc: 'Upload & Ingest' },
+  { id: 'chat',      label: 'Chat',       icon: '💬', desc: 'AI Analyst' },
+  { id: 'upload',    label: 'Documents',  icon: '📂', desc: 'Upload & Analyse' },
   { id: 'memory',    label: 'Memories',   icon: '🧠', desc: 'Knowledge Base' },
   { id: 'analytics', label: 'Analytics',  icon: '📈', desc: 'Usage & Insights' },
 ];
@@ -139,8 +139,8 @@ export default function Home() {
               fontSize: '1rem', boxShadow: 'var(--shadow-accent)', flexShrink: 0,
             }}>🧠</div>
             <div>
-              <div style={{ fontFamily: 'var(--font-head)', fontWeight: '700', fontSize: '1.1rem', letterSpacing: '-0.02em', background: 'var(--grad-accent)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>MemAI</div>
-              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Business Assistant</div>
+              <div style={{ fontFamily: 'var(--font-head)', fontWeight: '700', fontSize: '1.1rem', letterSpacing: '-0.02em', background: 'var(--grad-accent)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>TESS</div>
+              <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>AI Analyst</div>
             </div>
           </div>
         </div>
