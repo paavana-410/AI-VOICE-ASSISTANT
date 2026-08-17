@@ -48,7 +48,10 @@ def _make_memory_tools(user_id: str):
         """Search the shared persistent memory store for relevant facts."""
         clean_q = str(query).strip()[:100]
         try:
-            result = mem.search(query=clean_q, filters={"user_id": user_id}, limit=5)
+            _mem = get_memory_client()  # fixed: was referencing undefined `mem`
+            if _mem is None:
+                return "[]"
+            result = _mem.search(query=clean_q, filters={"user_id": user_id}, limit=5)
             memories = result.get("results", result) if isinstance(result, dict) else result
         except Exception:
             memories = []
@@ -57,8 +60,10 @@ def _make_memory_tools(user_id: str):
     @tool("memory_add")
     def memory_add(content: str) -> str:
         """Store a new fact or preference in the shared persistent memory store."""
-        mem = get_memory_client()
-        result = mem.add(messages=content, user_id=user_id)
+        _mem = get_memory_client()  # consistent naming
+        if _mem is None:
+            return '{"error": "Memory client not available"}'
+        result = _mem.add(messages=content, user_id=user_id)
         return json.dumps(result, default=str)
 
     @tool("web_search_stub")

@@ -67,10 +67,10 @@ def _caption_image(png_bytes: bytes, page: int) -> str:
                 ]
             }]
         }
-        models = [GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+        models = ["gemini-3.6-flash", "gemini-2.5-flash-preview-05-20", "gemini-1.5-flash"]
         for m in list(dict.fromkeys(models)):
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_API_KEY}"
-            resp = httpx.post(url, json=payload, timeout=15)
+            resp = httpx.post(url, json=payload, timeout=60)
             if resp.status_code == 200:
                 data = resp.json()
                 return data["candidates"][0]["content"]["parts"][0]["text"].strip()
