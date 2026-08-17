@@ -45,35 +45,74 @@ IMAGE_DIR = Path(__file__).parent.parent.parent / "data" / "document_images"
 # ── Gemini Vision helper ──────────────────────────────────────────────────────
 
 def _caption_image(png_bytes: bytes, page: int) -> str:
-    """Send image bytes to Gemini and return a factual caption string."""
-    if not GEMINI_API_KEY:
-        return f"[Image on page {page} — Gemini API key not configured]"
+    """Send image bytes to vision LLM — OpenRouter first, Gemini fallback."""
     try:
-        import httpx
+        import httpx, base64, asyncio
+
         b64 = base64.b64encode(png_bytes).decode()
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": "image/png", "data": b64}},
-                    {"text": (
-                        "Describe this image or diagram factually. "
-                        "If it shows a process, flow, or relationship between things, "
-                        "describe that explicitly. "
-                        "If it contains numbers, labels, percentages, or monetary values, "
-                        "include every one of them verbatim. "
-                        "Be thorough — this description will be used to answer questions "
-                        "about the document."
-                    )},
-                ]
-            }]
-        }
-        models = ["gemini-3.6-flash", "gemini-2.5-flash-preview-05-20", "gemini-1.5-flash"]
-        for m in list(dict.fromkeys(models)):
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_API_KEY}"
-            resp = httpx.post(url, json=payload, timeout=60)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        prompt = (
+            "Describe this image or diagram factually. "
+            "If it shows a process, flow, or relationship between things, describe that explicitly. "
+            "If it contains numbers, labels, percentages, or monetary values, include every one of them verbatim. "
+            "Be thorough — this description will be used to answer questions about the document."
+        )
+
+        from app.config import OPENROUTER_API_KEY, GEMINI_API_KEY
+
+        # ── OpenRouter vision (free, primary) ─────────────────────────────────
+        if OPENROUTER_API_KEY:
+            vl_models = [
+                "nvidia/nemotron-nano-12b-v2-vl:free",
+                "google/gemma-4-31b-it:free",
+            ]
+            payload = {
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                    ]
+                }],
+                "max_tokens": 512,
+            }
+            headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+            for model in vl_models:
+                try:
+                    resp = httpx.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={**payload, "model": model},
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        out = resp.json()["choices"][0]["message"]["content"].strip()
+                        if out and len(out) > 10:
+                            return out
+                    elif resp.status_code in (429, 503):
+                        continue
+                except Exception:
+                    continue
+
+        # ── Gemini fallback ────────────────────────────────────────────────────
+        if not GEMINI_API_KEY:
+            return f"[Image on page {page} — no vision API available]"
+
+        gemini_payload = {"contents": [{"parts": [
+            {"inline_data": {"mime_type": "image/png", "data": b64}},
+            {"text": prompt},
+        ]}]}
+        models = ["gemini-3.6-flash", "gemini-1.5-flash-8b"]
+        for m in models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_API_KEY}"
+                resp = httpx.post(url, json=gemini_payload, timeout=30)
+                if resp.status_code == 200:
+                    return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+                elif resp.status_code in (429, 503):
+                    continue
+            except Exception:
+                continue
+
         return f"[Image on page {page} — vision unavailable]"
     except Exception as exc:
         return f"[Image on page {page} — caption skipped: {type(exc).__name__}]"

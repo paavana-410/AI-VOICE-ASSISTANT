@@ -198,36 +198,83 @@ def _parse_pdf_llamaparse(data: bytes, filename: str) -> str:
 
 
 async def _parse_image(data: bytes, filename: str) -> str:
-    """Describe image via Gemini Vision. Tries each model with individual timeouts."""
-    if not GEMINI_API_KEY:
-        return f"[Image: {filename} — {len(data)//1024}KB — vision description unavailable, Gemini key not set]"
+    """Describe image via vision LLM. Tries OpenRouter VL first, then Gemini."""
     import base64
     import httpx
+
     ext  = Path(filename).suffix.lower()
     mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
             ".webp": "image/webp", ".gif": "image/gif"}.get(ext, "image/jpeg")
     b64  = base64.b64encode(data).decode()
-    payload = {"contents": [{"parts": [
+    prompt = "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."
+
+    # ── Path 1: OpenRouter vision model (free, no daily quota) ───────────────
+    from app.config import OPENROUTER_API_KEY
+    if OPENROUTER_API_KEY:
+        vl_models = [
+            "nvidia/nemotron-nano-12b-v2-vl:free",
+            "google/gemma-4-31b-it:free",
+            "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        ]
+        payload = {
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                ]
+            }],
+            "max_tokens": 1024,
+        }
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        for model in vl_models:
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json={**payload, "model": model},
+                    )
+                    if r.status_code == 200:
+                        text_out = r.json()["choices"][0]["message"]["content"].strip()
+                        if text_out and len(text_out) > 10:
+                            return f"[Image Content ({filename})]: {text_out}"
+                    elif r.status_code in (429, 503):
+                        continue
+            except (httpx.TimeoutException, httpx.ConnectError):
+                continue
+            except Exception:
+                continue
+
+    # ── Path 2: Gemini Vision fallback ────────────────────────────────────────
+    if not GEMINI_API_KEY:
+        size = f"{len(data)//1024}KB"
+        return f"[Image: {filename} ({size}) — vision description unavailable]"
+
+    gemini_payload = {"contents": [{"parts": [
         {"inline_data": {"mime_type": mime, "data": b64}},
-        {"text": "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."},
+        {"text": prompt},
     ]}]}
-    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash-preview-05-20", "gemini-1.5-flash"]
-    # Each model gets its own 30s timeout — if one times out, move to next immediately
-    for model in models_to_try:
+    gemini_models = ["gemini-3.6-flash", "gemini-1.5-flash-8b"]
+    for model in gemini_models:
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-                r = await client.post(url, json=payload)
+                r = await client.post(url, json=gemini_payload)
                 if r.status_code == 200:
                     text_out = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
                     if text_out:
                         return f"[Image Content ({filename})]: {text_out}"
                 elif r.status_code in (429, 503):
-                    continue  # rate limit or overload — try next model
+                    continue
         except (httpx.TimeoutException, httpx.ConnectError):
-            continue  # this model timed out — try next immediately
+            continue
         except Exception:
             continue
+
     size = f"{len(data)//1024}KB"
     return f"[Image: {filename} ({size}) — vision description unavailable]"
 
