@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
+from app.api.tts import router as tts_router
 from app.api.chat import router as chat_router
 from app.api.memory import router as memory_router
 from app.api.crew import router as crew_router
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(tts_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(memory_router, prefix="/api")
 app.include_router(crew_router, prefix="/api")

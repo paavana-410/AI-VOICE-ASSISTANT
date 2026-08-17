@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../src/authContext';
-import { sendChatMessage, generateImage, ingestFile, uploadDocument } from '../src/api';
+import { sendChatMessage, generateImage, ingestFile, uploadDocument, speakEdgeTTS } from '../src/api';
 
 type MessageRole = 'user' | 'assistant' | 'system';
 interface Message { id: number; role: MessageRole; content: string; imageUrl?: string; files?: { name: string; size: number }[]; }
@@ -36,11 +36,29 @@ function pickUSFemaleVoice(voices: SpeechSynthesisVoice[]) {
     ?? voices[0] ?? null;
 }
 
+function cleanForSpeech(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, '')                          // headings
+    .replace(/\*\*(.*?)\*\*/g, '$1')                     // bold
+    .replace(/\*(.*?)\*/g, '$1')                         // italic
+    .replace(/`[^`]+`/g, '')                             // inline code
+    .replace(/```[\s\S]*?```/g, '')                      // code blocks
+    .replace(/^\s*[-•*]\s+/gm, '')                       // bullet points
+    .replace(/^\s*\d+\.\s+/gm, '')                       // numbered lists
+    .replace(/\|[^\n]+\|/g, '')                          // table rows
+    .replace(/[-]{2,}/g, '')                             // horizontal rules / dashes
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')             // links → keep text
+    .replace(/\n{2,}/g, '. ')                            // blank lines → pause
+    .replace(/\n/g, ' ')                                 // single newlines → space
+    .replace(/\s{2,}/g, ' ')                             // collapse whitespace
+    .trim();
+}
+
 function speak(text: string, voice: SpeechSynthesisVoice | null, onStart?: () => void, onEnd?: () => void) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const clean = text.replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1')
-    .replace(/`[^`]+`/g,'').replace(/#{1,6}\s/g,'').substring(0, 500);
+  const clean = cleanForSpeech(text).substring(0, 800);  // longer limit now clean
+  if (!clean) return;
   const u = new SpeechSynthesisUtterance(clean);
   if (voice) u.voice = voice;
   u.lang = voice?.lang ?? 'en-US'; u.rate = 1.0; u.pitch = 1.0; u.volume = 1.0;
@@ -79,6 +97,7 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   const [isLoading, setIsLoading]       = useState(false);
   const [isSpeaking, setIsSpeaking]     = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const edgeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isListening, setIsListening]   = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [speechOk, setSpeechOk]         = useState(false);
@@ -174,6 +193,8 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
   // ── Stop audio ─────────────────────────────────────────────────────────────
   const stopAudio = useCallback(() => {
     window.speechSynthesis?.cancel();
+    edgeAudioRef.current?.pause();
+    edgeAudioRef.current = null;
     setIsSpeaking(false);
   }, []);
   const stageFiles = useCallback((files: FileList | File[] | null) => {
@@ -283,7 +304,19 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           abortRef.current = null;
           addMsg('assistant', r.reply);
           if (r.session_id) setSessionId(r.session_id);
-          if (voiceEnabled) speak(r.reply, selectedVoice, () => setIsSpeaking(true), () => setIsSpeaking(false));
+          if (voiceEnabled) {
+            setIsSpeaking(true);
+            // Try Edge TTS first (Microsoft Neural voice), fall back to Web Speech
+            const audio = await speakEdgeTTS(accessToken!, r.reply);
+            if (audio) {
+              edgeAudioRef.current = audio;
+              audio.onended = () => { setIsSpeaking(false); edgeAudioRef.current = null; };
+              audio.onerror = () => { setIsSpeaking(false); edgeAudioRef.current = null; speak(r.reply, selectedVoice); };
+              audio.play();
+            } else {
+              speak(r.reply, selectedVoice, () => setIsSpeaking(true), () => setIsSpeaking(false));
+            }
+          }
         }
       } else if (hasFiles) {
         // Files only — confirm upload with a brief assistant reply

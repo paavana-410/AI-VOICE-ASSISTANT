@@ -430,3 +430,26 @@ export async function listDocuments(token: string): Promise<StoredDocument[]> {
   if (!res.ok) throw new Error(`Failed to list documents: ${res.status}`);
   return res.json();
 }
+
+// ── Edge TTS ──────────────────────────────────────────────────────────────────
+export async function speakEdgeTTS(
+  token: string,
+  text: string,
+  voice = 'en-US-AriaNeural',
+): Promise<HTMLAudioElement | null> {
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text, voice }),
+    });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    return audio;
+  } catch {
+    return null;
+  }
+}
