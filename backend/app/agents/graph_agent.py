@@ -103,8 +103,9 @@ async def call_model_node(state: AgentState):
     tools = make_tools(user_id)
 
     # Try providers with tool binding sequentially — catch 429/rate/quota silently
+    # openrouter first since it has the most reliable free quota
     response = None
-    for provider in ["cerebras", "gemini", "groq", "openrouter", "nvidia"]:
+    for provider in ["openrouter", "cerebras", "groq", "gemini", "nvidia"]:
         bare_llm = _build_llm_by_name(provider)
         if bare_llm is None:
             continue
@@ -122,7 +123,7 @@ async def call_model_node(state: AgentState):
 
     # Last resort: plain invocation without tools, fresh provider loop (no cached llm)
     if response is None:
-        for provider in ["cerebras", "gemini", "groq", "openrouter", "nvidia"]:
+        for provider in ["openrouter", "cerebras", "groq", "gemini", "nvidia"]:
             plain_llm = _build_llm_by_name(provider)
             if plain_llm is None:
                 continue

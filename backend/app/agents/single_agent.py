@@ -163,7 +163,7 @@ def get_llm():
     """Build fresh LLM chain each call — no cache, so provider rotation works after 429s."""
     primary = _build_llm_by_name(LLM_PROVIDER)
     fallbacks = []
-    for p in ["cerebras", "gemini", "nvidia", "openrouter", "groq"]:
+    for p in ["openrouter", "cerebras", "groq", "gemini", "nvidia"]:
         if p != LLM_PROVIDER:
             fb = _build_llm_by_name(p)
             if fb is not None:
