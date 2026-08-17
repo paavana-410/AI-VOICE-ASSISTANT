@@ -321,32 +321,7 @@ def _parse_fallback(file_path: Path) -> list[dict[str, Any]]:
 
 def parse_pdf(file_path: str | Path) -> list[dict[str, Any]]:
     """
-    Parse a PDF into a list of typed elements in reading order.
-
-    Uses LlamaParse if LLAMA_CLOUD_API_KEY is configured (recommended).
-    Falls back to PyMuPDF + pdfplumber if the key is absent.
-
-    LlamaParse path:
-      1. LlamaParse handles all text, headings, and tables (including borderless).
-      2. PyMuPDF extracts embedded images separately (LlamaParse does not return bytes).
-      3. Both are merged and sorted by (page_number, y-position).
+    Parse a PDF using local PyMuPDF + pdfplumber (no external API needed).
+    Fast, offline, no timeouts.
     """
-    file_path = Path(file_path)
-
-    if LLAMA_CLOUD_API_KEY:
-        try:
-            text_elements  = _parse_with_llamaparse(file_path)
-            if text_elements:
-                image_elements = _extract_images_fitz(file_path)
-                all_elements   = text_elements + image_elements
-                # Sort: page first, then y0
-                all_elements.sort(key=lambda e: (e["page_number"], e["bbox"][1]))
-                return all_elements
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning(
-                "LlamaParse failed (%s) — falling back to PyMuPDF+pdfplumber", exc
-            )
-            # Fall through to fallback
-
-    return _parse_fallback(file_path)
+    return _parse_fallback(Path(file_path))
