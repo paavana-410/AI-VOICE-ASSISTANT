@@ -56,8 +56,8 @@ function cleanForSpeech(text: string): string {
 
 function speak(text: string, voice: SpeechSynthesisVoice | null, onStart?: () => void, onEnd?: () => void) {
   if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const clean = cleanForSpeech(text).substring(0, 800);  // longer limit now clean
+  window.speechSynthesis.cancel(); // always cancel before starting new utterance
+  const clean = cleanForSpeech(text).substring(0, 800);
   if (!clean) return;
   const u = new SpeechSynthesisUtterance(clean);
   if (voice) u.voice = voice;
@@ -305,15 +305,20 @@ export default function ChatWindow({ onRegisterLoader }: Props) {
           addMsg('assistant', r.reply);
           if (r.session_id) setSessionId(r.session_id);
           if (voiceEnabled) {
+            // Cancel any existing speech first
+            window.speechSynthesis?.cancel();
+            edgeAudioRef.current?.pause();
+            edgeAudioRef.current = null;
             setIsSpeaking(true);
-            // Try Edge TTS first (Microsoft Neural voice), fall back to Web Speech
+            // Try Edge TTS (Microsoft Aria Neural) — fall back to Web Speech only if null returned
             const audio = await speakEdgeTTS(accessToken!, r.reply);
             if (audio) {
               edgeAudioRef.current = audio;
               audio.onended = () => { setIsSpeaking(false); edgeAudioRef.current = null; };
-              audio.onerror = () => { setIsSpeaking(false); edgeAudioRef.current = null; speak(r.reply, selectedVoice); };
+              audio.onerror = () => { setIsSpeaking(false); edgeAudioRef.current = null; };
               audio.play();
             } else {
+              // Edge TTS unavailable — use Web Speech
               speak(r.reply, selectedVoice, () => setIsSpeaking(true), () => setIsSpeaking(false));
             }
           }
