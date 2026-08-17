@@ -50,7 +50,8 @@ IMAGE & DOCUMENT ANALYSIS RULES:
   2. Use a Markdown Table (`| Item | Information |`) listing key extracted fields, numbers, titles, names, dates, IDs, or metrics.
   3. Provide bullet points for key takeaways and insights.
   4. Include a concise summary section at the bottom.
-- If no image content is in DOCUMENT CONTEXT yet, ask the user to paste or upload the screenshot so you can analyze it immediately.
+- If DOCUMENT CONTEXT contains "[Image: filename — vision description unavailable]", it means the image was uploaded but OCR timed out. Tell the user: "I received your image but the text extraction timed out. Please paste it again — it usually works on the second try."
+- If no image content is in DOCUMENT CONTEXT yet, ask the user to paste or upload the screenshot.
 
 MEMORY (past conversations):
 {memories}

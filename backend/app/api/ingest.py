@@ -198,7 +198,7 @@ def _parse_pdf_llamaparse(data: bytes, filename: str) -> str:
 
 
 async def _parse_image(data: bytes, filename: str) -> str:
-    """Describe image via Gemini Vision. Falls back to metadata if unavailable."""
+    """Describe image via Gemini Vision. Tries each model with individual timeouts."""
     if not GEMINI_API_KEY:
         return f"[Image: {filename} — {len(data)//1024}KB — vision description unavailable, Gemini key not set]"
     import base64
@@ -212,17 +212,22 @@ async def _parse_image(data: bytes, filename: str) -> str:
         {"text": "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."},
     ]}]}
     models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash-preview-05-20", "gemini-1.5-flash"]
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            for model in models_to_try:
+    # Each model gets its own 30s timeout — if one times out, move to next immediately
+    for model in models_to_try:
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
                 r = await client.post(url, json=payload)
                 if r.status_code == 200:
                     text_out = r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
                     if text_out:
                         return f"[Image Content ({filename})]: {text_out}"
-    except Exception:
-        pass
+                elif r.status_code in (429, 503):
+                    continue  # rate limit or overload — try next model
+        except (httpx.TimeoutException, httpx.ConnectError):
+            continue  # this model timed out — try next immediately
+        except Exception:
+            continue
     size = f"{len(data)//1024}KB"
     return f"[Image: {filename} ({size}) — vision description unavailable]"
 
