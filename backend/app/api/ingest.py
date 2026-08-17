@@ -211,9 +211,9 @@ async def _parse_image(data: bytes, filename: str) -> str:
         {"inline_data": {"mime_type": mime, "data": b64}},
         {"text": "Describe this image factually. If it contains text, numbers, charts, or diagrams, extract all of them verbatim."},
     ]}]}
-    models_to_try = list(dict.fromkeys([GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]))
+    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash-preview-05-20", "gemini-1.5-flash"]
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=60) as client:
             for model in models_to_try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
                 r = await client.post(url, json=payload)
