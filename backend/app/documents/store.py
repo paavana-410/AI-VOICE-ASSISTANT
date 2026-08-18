@@ -58,14 +58,9 @@ async def ensure_vector_index() -> None:
 # ── Store ─────────────────────────────────────────────────────────────────────
 
 async def store_chunk(chunk: dict) -> None:
+    """Store a chunk immediately with empty embedding. Embedding computed in background."""
     col = _col()
-    # Store embedding for future vector search (when index available)
-    try:
-        loop = asyncio.get_running_loop()
-        embedding = await loop.run_in_executor(None, _embed, chunk["content"])
-    except Exception:
-        embedding = []
-    await col.insert_one({
+    doc = {
         "chunk_id":        chunk["chunk_id"],
         "document_id":     chunk["document_id"],
         "filename":        chunk.get("filename", ""),
@@ -75,12 +70,30 @@ async def store_chunk(chunk: dict) -> None:
         "content":         chunk["content"],
         "parent_id":       chunk.get("parent_id"),
         "image_path":      chunk.get("image_path"),
-        "embedding":       embedding,
-    })
+        "embedding":       [],   # filled by background embedder below
+    }
+    await col.insert_one(doc)
 
 async def store_chunks(chunks: list[dict]) -> None:
+    """Store all chunks immediately, then compute embeddings in background."""
+    # Insert all chunks first — fast, no blocking
+    await asyncio.gather(*[store_chunk(c) for c in chunks])
+    # Compute embeddings in background — doesn't delay upload response
+    asyncio.create_task(_embed_chunks_background(chunks))
+
+async def _embed_chunks_background(chunks: list[dict]) -> None:
+    """Compute and store embeddings after upload response is already sent."""
+    col = _col()
+    loop = asyncio.get_event_loop()
     for chunk in chunks:
-        await store_chunk(chunk)
+        try:
+            embedding = await loop.run_in_executor(None, _embed, chunk["content"][:512])
+            await col.update_one(
+                {"chunk_id": chunk["chunk_id"]},
+                {"$set": {"embedding": embedding}},
+            )
+        except Exception:
+            pass  # embedding failure never affects stored chunk
 
 
 # ── Search (regex-based — fast, no index needed) ──────────────────────────────

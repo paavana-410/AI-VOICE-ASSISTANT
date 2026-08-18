@@ -16,7 +16,7 @@ from app.api.analytics import router as analytics_router
 from app.auth import router as auth_router
 from app.health import router as health_router
 
-app = FastAPI(title="Business AI Assistant with Memory")
+app = FastAPI(title="TESS — AI Business Analyst")
 
 # CORS — reads from env so it works both locally and in production
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")

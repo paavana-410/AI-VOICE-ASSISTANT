@@ -87,15 +87,21 @@ async def upload_document(
         tmp_path = tmp.name
 
     try:
-        # ── Parse ──────────────────────────────────────────────────────────
-        elements = parse_pdf(tmp_path)
+        import asyncio as _asyncio
+        loop = _asyncio.get_event_loop()
+
+        # ── Parse (blocking I/O — run in thread) ───────────────────────────
+        elements = await loop.run_in_executor(None, parse_pdf, tmp_path)
         if not elements:
             raise HTTPException(422, "No content could be extracted from this PDF.")
 
         pages = max(e["page_number"] for e in elements)
 
-        # ── Chunk ──────────────────────────────────────────────────────────
-        chunks = chunk_elements(elements, document_id)
+        # ── Chunk (blocking — vision API calls inside) ─────────────────────
+        import functools
+        chunks = await loop.run_in_executor(
+            None, functools.partial(chunk_elements, elements, document_id)
+        )
         if not chunks:
             raise HTTPException(422, "Parser produced elements but chunker returned nothing.")
 
