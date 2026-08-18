@@ -290,7 +290,12 @@ def chat_with_memory(
             continue
         try:
             _resp = _llm.invoke([system_msg, human_msg])
-            assistant_reply = _resp.content
+            # Strip reasoning model think tags (Qwen, DeepSeek etc.)
+            import re as _re
+            raw = _resp.content or ""
+            raw = _re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=_re.IGNORECASE)
+            raw = _re.sub(r"</?think>", "", raw, flags=_re.IGNORECASE)
+            assistant_reply = raw.strip()
             break
         except Exception as _e:
             err_str = str(_e).lower()

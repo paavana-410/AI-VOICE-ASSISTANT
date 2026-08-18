@@ -9,6 +9,7 @@ Replaces standard loops with a compiled LangGraph StateGraph:
 """
 from __future__ import annotations
 
+import re as _re
 from typing import Annotated, Sequence, TypedDict
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
@@ -133,6 +134,13 @@ async def call_model_node(state: AgentState):
                 continue
             response = None  # non-rate error — still try next provider
 
+    # Strip think tags from response content if present
+    if response and hasattr(response, "content") and isinstance(response.content, str):
+        cleaned = _re.sub(r"<think>[\s\S]*?</think>", "", response.content, flags=_re.IGNORECASE)
+        cleaned = _re.sub(r"</?think>", "", cleaned, flags=_re.IGNORECASE).strip()
+        if cleaned:
+            response.content = cleaned
+
     # Last resort: plain invocation without tools, fresh provider loop (no cached llm)
     if response is None:
         for provider in ["openrouter", "cerebras", "groq", "gemini", "nvidia"]:
@@ -198,6 +206,17 @@ builder.add_edge("tools", "agent")
 langgraph_app = builder.compile()
 
 
+
+
+def _clean_response(text: str) -> str:
+    """Strip reasoning model think tags and clean whitespace."""
+    # Remove <think>...</think> blocks (Qwen, DeepSeek reasoning models)
+    text = _re.sub(r"<think>[\s\S]*?</think>", "", text, flags=_re.IGNORECASE)
+    # Remove any leftover <think> or </think> tags
+    text = _re.sub(r"</?think>", "", text, flags=_re.IGNORECASE)
+    return text.strip()
+
+
 async def run_langgraph_chat(
     user_message: str,
     user_id: str,
@@ -216,10 +235,9 @@ async def run_langgraph_chat(
         for m in reversed(messages):
             if isinstance(m, AIMessage) and m.content:
                 if isinstance(m.content, list):
-                    return "".join(item.get("text", "") if isinstance(item, dict) else str(item) for item in m.content).strip()
-                return str(m.content)
+                    return _clean_response("".join(item.get("text", "") if isinstance(item, dict) else str(item) for item in m.content).strip())
+                return _clean_response(str(m.content))
         return "Task processed successfully."
     except Exception as e:
-        # Fallback to plain single agent execution if graph execution encounters unexpected issues
         from app.agents.single_agent import chat_with_memory
         return chat_with_memory(user_message=user_message, user_id=user_id, doc_context=doc_context)
