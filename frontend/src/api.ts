@@ -21,13 +21,20 @@ export async function sendChatMessage(
   sessionId?: string | null,
 ): Promise<{ reply: string; user_id: string; session_id: string }> {
   const endpoint = isCrew ? '/api/crew-chat' : '/api/chat';
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify({ message, session_id: sessionId ?? null }),
-  });
-  if (!res.ok) throw new Error(`Chat failed: ${res.status}`);
-  return res.json();
+  const body = JSON.stringify({ message, session_id: sessionId ?? null });
+  const headers = authHeaders(token);
+
+  // Auto-retry once on 500 (transient rate-limit spike) after 2s
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(endpoint, { method: 'POST', headers, body });
+    if (res.ok) return res.json();
+    if (res.status === 500 && attempt === 0) {
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+    throw new Error(`Chat failed: ${res.status}`);
+  }
+  throw new Error('Chat failed after retry');
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
