@@ -280,13 +280,87 @@ async def _parse_image(data: bytes, filename: str) -> str:
 
 
 def _media_metadata(filename: str, data: bytes, file_type: str) -> str:
-    """Return metadata string for audio/video (full transcription is future work)."""
+    """Return metadata string for audio/video — fallback if transcription fails."""
     size = f"{len(data)/(1024*1024):.1f}MB"
-    return (
-        f"[{file_type.upper()} file uploaded: {filename} ({size})]\n"
-        f"Note: Automatic transcription coming soon. "
-        f"You can ask the assistant about this file by name."
-    )
+    return f"[{file_type.upper()} file: {filename} ({size}) — transcription unavailable]"
+
+
+async def _transcribe_audio(data: bytes, filename: str, file_type: str) -> str:
+    """
+    Transcribe audio using Groq Whisper API (whisper-large-v3-turbo).
+    For video: audio stream is extracted first using pydub/moviepy.
+    Falls back to metadata if transcription fails.
+
+    Groq Whisper limits: 25MB per file, 2 hrs audio/day free.
+    """
+    from app.config import GROQ_API_KEY
+    if not GROQ_API_KEY:
+        return _media_metadata(filename, data, file_type)
+
+    size_mb = len(data) / (1024 * 1024)
+    if size_mb > 24:
+        return f"[{file_type.upper()}: {filename} ({size_mb:.1f}MB) — exceeds 24MB Whisper limit. Trim file and re-upload.]"
+
+    try:
+        import httpx, io
+
+        # For video — extract audio track first
+        audio_data = data
+        audio_filename = filename
+        if file_type == "video":
+            try:
+                import tempfile, os
+                from pathlib import Path
+                ext = Path(filename).suffix.lower()
+                with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+                    tmp.write(data)
+                    tmp_path = tmp.name
+                try:
+                    # Try moviepy first
+                    from moviepy import VideoFileClip  # type: ignore
+                    clip = VideoFileClip(tmp_path)
+                    audio_buf = io.BytesIO()
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as atmp:
+                        clip.audio.write_audiofile(atmp.name, logger=None)
+                        clip.close()
+                        with open(atmp.name, "rb") as f:
+                            audio_data = f.read()
+                        os.unlink(atmp.name)
+                    audio_filename = Path(filename).stem + ".mp3"
+                except Exception:
+                    # moviepy failed — send video directly, Whisper can handle mp4 audio tracks
+                    audio_data = data
+                    audio_filename = filename
+                finally:
+                    try: os.unlink(tmp_path)
+                    except: pass
+            except Exception:
+                audio_data = data
+                audio_filename = filename
+
+        # Send to Groq Whisper
+        async with httpx.AsyncClient(timeout=120) as client:
+            files = {"file": (audio_filename, audio_data, "application/octet-stream")}
+            data_form = {"model": "whisper-large-v3-turbo", "response_format": "text"}
+            headers = {"Authorization": f"Bearer {GROQ_API_KEY}"}
+            r = await client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers=headers,
+                files=files,
+                data=data_form,
+            )
+            if r.status_code == 200:
+                transcript = r.text.strip()
+                if transcript:
+                    size_str = f"{size_mb:.1f}MB"
+                    return f"[{file_type.upper()} Transcript ({filename}, {size_str})]:\n{transcript}"
+            else:
+                return _media_metadata(filename, data, file_type)
+
+    except Exception as e:
+        return _media_metadata(filename, data, file_type)
+
+    return _media_metadata(filename, data, file_type)
 
 
 # ── Main endpoint ─────────────────────────────────────────────────────────────
@@ -322,7 +396,7 @@ async def ingest_file(
         elif file_type == "image":
             text = await _parse_image(data, filename)
         elif file_type in ("audio", "video"):
-            text = _media_metadata(filename, data, file_type)
+            text = await _transcribe_audio(data, filename, file_type)
         else:
             raise HTTPException(400, f"Unsupported: {file_type}")
     except HTTPException:
