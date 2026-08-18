@@ -82,18 +82,31 @@ async def store_chunks(chunks: list[dict]) -> None:
     asyncio.create_task(_embed_chunks_background(chunks))
 
 async def _embed_chunks_background(chunks: list[dict]) -> None:
-    """Compute and store embeddings after upload response is already sent."""
+    """Compute embeddings + image captions after upload response is already sent."""
     col = _col()
     loop = asyncio.get_event_loop()
     for chunk in chunks:
         try:
+            # Update embedding
             embedding = await loop.run_in_executor(None, _embed, chunk["content"][:512])
+            update: dict = {"embedding": embedding}
+
+            # Update image captions for pending chunks
+            if chunk.get("chunk_type") == "image_caption" and "caption pending" in chunk.get("content", ""):
+                img_path = chunk.get("image_path")
+                if img_path:
+                    from pathlib import Path as _Path
+                    png_bytes = _Path(img_path).read_bytes()
+                    from app.documents.chunker import _caption_image
+                    caption = await loop.run_in_executor(None, _caption_image, png_bytes, chunk.get("page_number", 1))
+                    update["content"] = caption
+
             await col.update_one(
                 {"chunk_id": chunk["chunk_id"]},
-                {"$set": {"embedding": embedding}},
+                {"$set": update},
             )
         except Exception:
-            pass  # embedding failure never affects stored chunk
+            pass
 
 
 # ── Search (regex-based — fast, no index needed) ──────────────────────────────

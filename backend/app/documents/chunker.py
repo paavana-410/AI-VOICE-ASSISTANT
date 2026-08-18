@@ -253,8 +253,9 @@ def chunk_elements(
             img_path = IMAGE_DIR / img_filename
             img_path.write_bytes(png_bytes)
 
-            # Get Gemini caption
-            caption = _caption_image(png_bytes, page)
+            # Store chunk immediately with placeholder caption
+            # The actual vision caption is filled in by background task after upload
+            caption = f"[Image on page {page} — caption pending]"
 
             parent_id = last_text_chunk_id_by_page.get(page)
             cid = _make_id()
